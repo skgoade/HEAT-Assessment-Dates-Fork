@@ -4,6 +4,10 @@ from flask_cors import CORS
 import mysql.connector
 from datetime import datetime
 import logging
+# from dotenv import load_dotenv  # Add this line
+
+# # Load environment variables from .env file
+# load_dotenv()  # Add this line
 
 app = Flask(__name__)
 
@@ -25,19 +29,17 @@ DB_CONFIG = {
     'host': os.environ.get('DB_HOST'),
     'user': os.environ.get('DB_USER'),
     'password': os.environ.get('DB_PASS'),
-    'database': os.environ.get('DB_NAME_PROD'),
+    'database': os.environ.get('DB_NAME_PROD', 'PlayerDev'),
     'port': int(os.environ.get('DB_PORT', 3306)),
     'connect_timeout': 10,
-    'use_pure': False
+    'use_pure': True
 }
 
 def get_db_connection():
     """Create and return a database connection"""
     try:
+        # Connect with the database already specified
         connection = mysql.connector.connect(**DB_CONFIG)
-        cursor = connection.cursor()
-        cursor.execute(f"USE {os.environ.get('DB_NAME_PROD')}")
-        cursor.close()
         logger.info("Database connection established")
         return connection
     except Exception as e:

@@ -6,8 +6,8 @@
 set -e  # Exit on error
 
 # Configuration
-PROJECT_ID="your-gcp-project-id"
-REGION="us-central1"
+PROJECT_ID="norse-coral-441421-r9"
+REGION="us-east4"
 SERVICE_NAME="hitting-assessment-api"
 IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 

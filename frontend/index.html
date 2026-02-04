@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RBI Hitting Assessment Form</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #111521 0%, #1a1f3a 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(252, 186, 57, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 20px;
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        h1 {
+            color: #fcba39;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 28px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #fcba39;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        label .required {
+            color: #ff4444;
+            margin-left: 4px;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid rgba(252, 186, 57, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        input[type="date"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #fcba39;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23fcba39' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 40px;
+        }
+
+        /* Chrome, Safari, Edge, Opera - remove spinner for date input */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
+
+        .helper-text {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 6px;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #fcba39 0%, #f0a020 100%);
+            color: #111521;
+            border: none;
+            border-radius: 8px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(252, 186, 57, 0.3);
+        }
+
+        button[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(252, 186, 57, 0.4);
+        }
+
+        button[type="submit"]:active {
+            transform: translateY(0);
+        }
+
+        button[type="submit"]:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 15px;
+            display: none;
+        }
+
+        .message.success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #90ee90;
+        }
+
+        .message.error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #ff6b6b;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .info-box {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .info-box-title {
+            color: #64b5f6;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .info-box-content {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .datalist-option {
+            background: #1a1f3a;
+            color: white;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 24px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .logo {
+                width: 150px;
+                height: 150px;
+            }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(17, 21, 33, 0.3);
+            border-radius: 50%;
+            border-top-color: #111521;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="RBI_HEAT_Logo_Outline_Seams.png" alt="RBI HEAT Logo" onerror="this.style.display='none'">
+            </div>
+            <h1>Hitting Assessment</h1>
+            <p class="subtitle">Record player assessment data for automated reporting</p>
+        </div>
+
+        <div class="info-box">
+            <div class="info-box-title">📊 Assessment Information</div>
+            <div class="info-box-content">
+                This form creates a new hitting assessment record with an auto-generated ID. 
+                The system will automatically link this assessment with Blast and HitTrax swing data 
+                from within 7 days of the assessment date for comprehensive analysis and progress tracking.
+            </div>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <form id="assessmentForm">
+            <!-- Player Name -->
+            <div class="form-group">
+                <label for="playerName">
+                    Player Name<span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="playerName" 
+                    name="playerName" 
+                    required
+                    placeholder="Enter player name"
+                    list="playerNames"
+                    autocomplete="off"
+                >
+                <datalist id="playerNames">
+                    <!-- Player names will be populated from recent assessments if available -->
+                </datalist>
+                <div class="helper-text">Full name of the player being assessed</div>
+            </div>
+
+            <!-- Assessment Date -->
+            <div class="form-group">
+                <label for="assessmentDate">
+                    Assessment Date<span class="required">*</span>
+                </label>
+                <input 
+                    type="date" 
+                    id="assessmentDate" 
+                    name="assessmentDate" 
+                    required
+                >
+                <div class="helper-text">Date when the assessment was conducted</div>
+            </div>
+
+            <!-- Trainer Name -->
+            <div class="form-group">
+                <label for="trainerName">
+                    Trainer Name
+                </label>
+                <input 
+                    type="text" 
+                    id="trainerName" 
+                    name="trainerName" 
+                    placeholder="Enter trainer name"
+                    list="trainerNames"
+                    autocomplete="off"
+                >
+                <datalist id="trainerNames">
+                    <!-- Trainer names will be populated from recent assessments if available -->
+                </datalist>
+                <div class="helper-text">Name of the trainer conducting the assessment (optional)</div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-group">
+                <label for="notes">
+                    Assessment Notes
+                </label>
+                <textarea 
+                    id="notes" 
+                    name="notes" 
+                    placeholder="Enter any observations, goals, or specific focuses for this assessment..."
+                ></textarea>
+                <div class="helper-text">
+                    Optional notes about the assessment (e.g., areas of focus, observations, goals)
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">
+                Submit Assessment
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // Configuration - Update this with your backend API URL
+        const API_URL = 'https://your-backend-url.run.app/api/hitting-assessment';
+        // For local development: const API_URL = 'http://localhost:8080/api/hitting-assessment';
+
+        const form = document.getElementById('assessmentForm');
+        const messageEl = document.getElementById('message');
+        const submitBtn = document.getElementById('submitBtn');
+        const assessmentDateInput = document.getElementById('assessmentDate');
+
+        // Set today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        assessmentDateInput.value = today;
+        assessmentDateInput.max = today; // Prevent future dates
+
+        // Load recent player and trainer names for autocomplete
+        async function loadRecentNames() {
+            try {
+                const response = await fetch(API_URL.replace('/hitting-assessment', '/hitting-assessment/recent?limit=100'));
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Extract unique player names
+                    const playerNames = [...new Set(data.assessments.map(a => a.player_name))];
+                    const playerDatalist = document.getElementById('playerNames');
+                    playerNames.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        playerDatalist.appendChild(option);
+                    });
+
+                    // Extract unique trainer names
+                    const trainerNames = [...new Set(
+                        data.assessments
+                            .map(a => a.trainer_name)
+                            .filter(name => name)
+                    )];
+                    const trainerDatalist = document.getElementById('trainerNames');
+                    trainerNames.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        trainerDatalist.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.log('Could not load recent names for autocomplete:', error);
+            }
+        }
+
+        // Load names on page load
+        loadRecentNames();
+
+        function showMessage(text, type) {
+            messageEl.textContent = text;
+            messageEl.className = `message ${type} show`;
+            messageEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageEl.classList.remove('show');
+                }, 5000);
+            }
+        }
+
+        function setLoading(isLoading) {
+            submitBtn.disabled = isLoading;
+            if (isLoading) {
+                submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
+            } else {
+                submitBtn.textContent = 'Submit Assessment';
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Hide any previous messages
+            messageEl.classList.remove('show');
+            
+            // Get form data
+            const formData = {
+                playerName: document.getElementById('playerName').value.trim(),
+                assessmentDate: document.getElementById('assessmentDate').value,
+                trainerName: document.getElementById('trainerName').value.trim(),
+                notes: document.getElementById('notes').value.trim()
+            };
+
+            // Client-side validation
+            if (!formData.playerName) {
+                showMessage('Please enter a player name', 'error');
+                return;
+            }
+
+            if (!formData.assessmentDate) {
+                showMessage('Please select an assessment date', 'error');
+                return;
+            }
+
+            // Set loading state
+            setLoading(true);
+
+            try {
+                // Submit to API
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Success
+                    showMessage(
+                        `✓ Assessment submitted successfully! Assessment ID: ${data.assessment_id} for ${data.player}`,
+                        'success'
+                    );
+                    
+                    // Reset form
+                    form.reset();
+                    assessmentDateInput.value = today;
+                    
+                    // Reload autocomplete names
+                    setTimeout(loadRecentNames, 1000);
+                } else {
+                    // Error from server
+                    showMessage(`Error: ${data.error || 'Failed to submit assessment'}`, 'error');
+                }
+            } catch (error) {
+                // Network or other error
+                console.error('Submission error:', error);
+                showMessage(
+                    'Failed to connect to server. Please check your connection and try again.',
+                    'error'
+                );
+            } finally {
+                // Remove loading state
+                setLoading(false);
+            }
+        });
+
+        // Auto-capitalize player and trainer names
+        document.getElementById('playerName').addEventListener('blur', function() {
+            this.value = this.value.split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+        });
+
+        document.getElementById('trainerName').addEventListener('blur', function() {
+            this.value = this.value.split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+        });
+    </script>
+</body>
+</html>

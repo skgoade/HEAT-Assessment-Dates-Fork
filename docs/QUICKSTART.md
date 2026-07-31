@@ -120,7 +120,7 @@ ORDER BY ha.assessment_date;
 
 **Views return no data?**
 - Check that player names match exactly between tables
-- Verify dates are within ±7 days of swing data
+- Verify swing data exists on the assessment calendar day
 - Check column names match your actual Blast/HitTrax tables
 
 **Database connection failed?**
@@ -141,8 +141,8 @@ ORDER BY ha.assessment_date;
 
 When you create an assessment with date `2024-02-04`:
 
-1. **Blast View**: Finds all Blast sessions for that player between `2024-01-28` and `2024-02-11` (±7 days)
-2. **HitTrax View**: Finds all HitTrax sessions for that player in the same date range
+1. **Blast View**: Finds Blast sessions for that player on `2024-02-04` (assessment day only)
+2. **HitTrax View**: Finds HitTrax sessions for that player on the same day
 3. **Combined View**: Matches Blast and HitTrax swings using the `ts` timestamp field
 
 ### Assessment Numbering

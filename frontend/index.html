@@ -37,7 +37,7 @@
 
         .logo {
             width: 200px;
-            height: 200px;
+            height: 120px;
             margin: 0 auto 20px;
         }
 
@@ -114,7 +114,11 @@
             padding-right: 40px;
         }
 
-        /* Chrome, Safari, Edge, Opera - remove spinner for date input */
+        select option {
+            background: #1a1f3a;
+            color: #ffffff;
+        }
+
         input[type="date"]::-webkit-calendar-picker-indicator {
             filter: invert(1);
             cursor: pointer;
@@ -156,12 +160,71 @@
             transform: none;
         }
 
+        .secondary-btn {
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            color: #fcba39;
+            border: 2px solid rgba(252, 186, 57, 0.5);
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 12px;
+            font-family: inherit;
+        }
+
+        .secondary-btn:hover {
+            background: rgba(252, 186, 57, 0.12);
+            border-color: #fcba39;
+        }
+
+        .secondary-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .divider {
+            margin: 36px 0 28px;
+            border: none;
+            border-top: 1px solid rgba(252, 186, 57, 0.2);
+        }
+
+        .regen-section h2 {
+            color: #fcba39;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .regen-section .section-intro {
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .inline-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .inline-actions button {
+            width: auto;
+            margin-top: 0;
+            padding: 8px 14px;
+            font-size: 14px;
+        }
+
         .message {
             padding: 16px;
             border-radius: 8px;
             margin-bottom: 20px;
             font-size: 15px;
             display: none;
+            line-height: 1.5;
         }
 
         .message.success {
@@ -178,6 +241,11 @@
 
         .message.show {
             display: block;
+        }
+
+        .message a {
+            color: #fcba39;
+            font-weight: 600;
         }
 
         .info-box {
@@ -201,9 +269,50 @@
             line-height: 1.6;
         }
 
-        .datalist-option {
-            background: #1a1f3a;
-            color: white;
+        .type-panel {
+            display: none;
+            background: rgba(252, 186, 57, 0.08);
+            border: 1px solid rgba(252, 186, 57, 0.35);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 28px;
+        }
+
+        .type-panel.show {
+            display: block;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            margin-bottom: 8px;
+        }
+
+        .type-badge.initial {
+            background: rgba(100, 181, 246, 0.25);
+            color: #90caf9;
+        }
+
+        .type-badge.retest {
+            background: rgba(252, 186, 57, 0.25);
+            color: #fcba39;
+        }
+
+        .type-panel p {
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .lookup-status {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.55);
+            margin-top: 6px;
+            min-height: 1.2em;
         }
 
         @media (max-width: 640px) {
@@ -217,11 +326,10 @@
 
             .logo {
                 width: 150px;
-                height: 150px;
+                height: 90px;
             }
         }
 
-        /* Loading spinner */
         .spinner {
             display: inline-block;
             width: 16px;
@@ -243,85 +351,93 @@
     <div class="container">
         <div class="header">
             <div class="logo">
-                <img src="RBI_HEAT_Logo.svg" alt="RBI HEAT Logo" onerror="this.style.display='none'">
+                <img src="rbi_heat_logo.png" alt="RBI HEAT Logo" onerror="this.style.display='none'">
             </div>
             <h1>Hitting Assessment</h1>
             <p class="subtitle">Record player assessment data for automated reporting</p>
         </div>
 
         <div class="info-box">
-            <div class="info-box-title">📊 Assessment Information</div>
+            <div class="info-box-title">Assessment Information</div>
             <div class="info-box-content">
-                This form creates a new hitting assessment record with an auto-generated ID. 
-                The system will automatically link this assessment with Blast and HitTrax swing data 
-                from within 7 days of the assessment date for comprehensive analysis and progress tracking.
+                Enter the athlete name. If they’ve tested before, we’ll show prior dates so you can
+                confirm which one to compare against. Metrics use that assessment calendar day only
+                (Blast, HitTrax, and VALD). After submit, a draft PDF is generated automatically.
             </div>
         </div>
 
         <div id="message" class="message"></div>
 
         <form id="assessmentForm">
-            <!-- Player Name -->
             <div class="form-group">
                 <label for="playerName">
                     Player Name<span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    id="playerName" 
-                    name="playerName" 
+                <input
+                    type="text"
+                    id="playerName"
+                    name="playerName"
                     required
                     placeholder="Enter player name"
                     list="playerNames"
                     autocomplete="off"
                 >
-                <datalist id="playerNames">
-                    <!-- Player names will be populated from recent assessments if available -->
-                </datalist>
+                <datalist id="playerNames"></datalist>
                 <div class="helper-text">Full name of the player being assessed</div>
+                <div id="lookupStatus" class="lookup-status"></div>
             </div>
 
-            <!-- Assessment Date -->
+            <div id="typePanel" class="type-panel" aria-live="polite">
+                <span id="typeBadge" class="type-badge">—</span>
+                <p id="typeCopy"></p>
+                <div id="previousGroup" class="form-group" style="margin-top: 16px; margin-bottom: 0; display: none;">
+                    <label for="previousAssessmentId">
+                        Previous assessment to compare<span class="required">*</span>
+                    </label>
+                    <select id="previousAssessmentId" name="previousAssessmentId">
+                    </select>
+                    <div class="helper-text">
+                        Defaults to the most recent. Baseline (earliest Initial) is resolved automatically for the PDF.
+                    </div>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="assessmentDate">
                     Assessment Date<span class="required">*</span>
                 </label>
-                <input 
-                    type="date" 
-                    id="assessmentDate" 
-                    name="assessmentDate" 
+                <input
+                    type="date"
+                    id="assessmentDate"
+                    name="assessmentDate"
                     required
                 >
                 <div class="helper-text">Date when the assessment was conducted</div>
             </div>
 
-            <!-- Trainer Name -->
             <div class="form-group">
                 <label for="trainerName">
                     Trainer Name
                 </label>
-                <input 
-                    type="text" 
-                    id="trainerName" 
-                    name="trainerName" 
+                <input
+                    type="text"
+                    id="trainerName"
+                    name="trainerName"
                     placeholder="Enter trainer name"
                     list="trainerNames"
                     autocomplete="off"
                 >
-                <datalist id="trainerNames">
-                    <!-- Trainer names will be populated from recent assessments if available -->
-                </datalist>
+                <datalist id="trainerNames"></datalist>
                 <div class="helper-text">Name of the trainer conducting the assessment (optional)</div>
             </div>
 
-            <!-- Notes -->
             <div class="form-group">
                 <label for="notes">
                     Assessment Notes
                 </label>
-                <textarea 
-                    id="notes" 
-                    name="notes" 
+                <textarea
+                    id="notes"
+                    name="notes"
                     placeholder="Enter any observations, goals, or specific focuses for this assessment..."
                 ></textarea>
                 <div class="helper-text">
@@ -333,164 +449,385 @@
                 Submit Assessment
             </button>
         </form>
+
+        <hr class="divider">
+
+        <section class="regen-section" aria-labelledby="regenHeading">
+            <h2 id="regenHeading">Regenerate PDF</h2>
+            <p class="section-intro">
+                Already have an assessment ID? Generate a new draft PDF without creating another assessment.
+            </p>
+            <div class="form-group">
+                <label for="regenAssessmentId">
+                    Assessment ID<span class="required">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="regenAssessmentId"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="e.g. 3"
+                    autocomplete="off"
+                >
+                <div class="helper-text">From a prior submit success message or the database</div>
+            </div>
+            <button type="button" class="secondary-btn" id="regenBtn">
+                Generate PDF
+            </button>
+            <div id="regenMessage" class="message" style="margin-top: 16px;"></div>
+        </section>
     </div>
 
     <script>
-        // Configuration - Update this with your backend API URL
+        // Local testing: use the localhost line and comment the Cloud Run URL.
         // const API_URL = 'http://localhost:8080/api/hitting-assessment';
-        // For production: 
         const API_URL = 'https://hitting-assessment-api-973347833854.us-east4.run.app/api/hitting-assessment';
 
         const form = document.getElementById('assessmentForm');
         const messageEl = document.getElementById('message');
         const submitBtn = document.getElementById('submitBtn');
         const assessmentDateInput = document.getElementById('assessmentDate');
+        const playerNameInput = document.getElementById('playerName');
+        const lookupStatus = document.getElementById('lookupStatus');
+        const typePanel = document.getElementById('typePanel');
+        const typeBadge = document.getElementById('typeBadge');
+        const typeCopy = document.getElementById('typeCopy');
+        const previousGroup = document.getElementById('previousGroup');
+        const previousSelect = document.getElementById('previousAssessmentId');
 
-        // Set today's date as default
+        let assessmentType = null; // 'initial' | 'retest'
+        let lookupToken = 0;
+
         const today = new Date().toISOString().split('T')[0];
         assessmentDateInput.value = today;
-        assessmentDateInput.max = today; // Prevent future dates
+        assessmentDateInput.max = today;
 
-        // Load recent player and trainer names for autocomplete
+        function titleCaseName(value) {
+            return value.split(/\s+/)
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+        }
+
+        function formatAssessmentOption(a) {
+            const type = (a.assessment_type || '').toString();
+            const typeLabel = type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Assessment';
+            return `#${a.assessment_id} · ${a.assessment_date} · ${typeLabel}`;
+        }
+
+        function resetTypePanel() {
+            assessmentType = null;
+            typePanel.classList.remove('show');
+            previousGroup.style.display = 'none';
+            previousSelect.innerHTML = '';
+            previousSelect.required = false;
+            lookupStatus.textContent = '';
+        }
+
+        function showInitial() {
+            assessmentType = 'initial';
+            typePanel.classList.add('show');
+            typeBadge.textContent = 'Initial';
+            typeBadge.className = 'type-badge initial';
+            typeCopy.textContent = 'No prior assessments found for this player. This will be saved as an Initial assessment.';
+            previousGroup.style.display = 'none';
+            previousSelect.innerHTML = '';
+            previousSelect.required = false;
+        }
+
+        function showRetest(assessments) {
+            assessmentType = 'retest';
+            typePanel.classList.add('show');
+            typeBadge.textContent = 'Retest';
+            typeBadge.className = 'type-badge retest';
+            typeCopy.textContent = `Found ${assessments.length} prior assessment${assessments.length === 1 ? '' : 's'}. Confirm which previous date to compare against.`;
+            previousGroup.style.display = 'block';
+            previousSelect.required = true;
+            previousSelect.innerHTML = '';
+            assessments.forEach((a, i) => {
+                const opt = document.createElement('option');
+                opt.value = a.assessment_id;
+                opt.textContent = formatAssessmentOption(a);
+                if (i === 0) opt.selected = true; // most recent (API is newest first)
+                previousSelect.appendChild(opt);
+            });
+        }
+
+        async function lookupPlayerPriors(rawName) {
+            const name = titleCaseName(rawName.trim());
+            if (name.length < 2) {
+                resetTypePanel();
+                return;
+            }
+
+            const token = ++lookupToken;
+            lookupStatus.textContent = 'Looking up prior assessments…';
+
+            try {
+                const url = `${API_URL}/player/${encodeURIComponent(name)}`;
+                const response = await fetch(url);
+                if (token !== lookupToken) return;
+
+                if (!response.ok) {
+                    lookupStatus.textContent = 'Could not look up priors — check connection and try again.';
+                    resetTypePanel();
+                    return;
+                }
+
+                const data = await response.json();
+                if (token !== lookupToken) return;
+
+                const assessments = data.assessments || [];
+                lookupStatus.textContent = assessments.length
+                    ? `${assessments.length} prior assessment${assessments.length === 1 ? '' : 's'} found`
+                    : 'No prior assessments — will save as Initial';
+
+                if (assessments.length === 0) {
+                    showInitial();
+                } else {
+                    showRetest(assessments);
+                }
+            } catch (err) {
+                if (token !== lookupToken) return;
+                console.error('Prior lookup failed:', err);
+                lookupStatus.textContent = 'Lookup failed. You can still submit after retrying the name.';
+                resetTypePanel();
+            }
+        }
+
         async function loadRecentNames() {
             try {
-                const response = await fetch(API_URL.replace('/hitting-assessment', '/hitting-assessment/recent?limit=100'));
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // Extract unique player names
-                    const playerNames = [...new Set(data.assessments.map(a => a.player_name))];
-                    const playerDatalist = document.getElementById('playerNames');
-                    playerNames.forEach(name => {
+                const response = await fetch(`${API_URL}/recent?limit=100`);
+                if (!response.ok) return;
+                const data = await response.json();
+                const assessments = data.assessments || [];
+
+                const playerDatalist = document.getElementById('playerNames');
+                playerDatalist.innerHTML = '';
+                [...new Set(assessments.map(a => a.player_name).filter(Boolean))]
+                    .sort((a, b) => a.localeCompare(b))
+                    .forEach(name => {
                         const option = document.createElement('option');
                         option.value = name;
                         playerDatalist.appendChild(option);
                     });
 
-                    // Extract unique trainer names
-                    const trainerNames = [...new Set(
-                        data.assessments
-                            .map(a => a.trainer_name)
-                            .filter(name => name)
-                    )];
-                    const trainerDatalist = document.getElementById('trainerNames');
-                    trainerNames.forEach(name => {
+                const trainerDatalist = document.getElementById('trainerNames');
+                trainerDatalist.innerHTML = '';
+                [...new Set(assessments.map(a => a.trainer_name).filter(Boolean))]
+                    .sort((a, b) => a.localeCompare(b))
+                    .forEach(name => {
                         const option = document.createElement('option');
                         option.value = name;
                         trainerDatalist.appendChild(option);
                     });
-                }
             } catch (error) {
                 console.log('Could not load recent names for autocomplete:', error);
             }
         }
 
-        // Load names on page load
         loadRecentNames();
 
-        function showMessage(text, type) {
-            messageEl.textContent = text;
+        playerNameInput.addEventListener('blur', function () {
+            this.value = titleCaseName(this.value);
+            lookupPlayerPriors(this.value);
+        });
+
+        playerNameInput.addEventListener('change', function () {
+            // datalist pick
+            this.value = titleCaseName(this.value);
+            lookupPlayerPriors(this.value);
+        });
+
+        document.getElementById('trainerName').addEventListener('blur', function () {
+            this.value = titleCaseName(this.value);
+        });
+
+        function showMessage(html, type) {
+            messageEl.innerHTML = html;
             messageEl.className = `message ${type} show`;
             messageEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            
-            // Auto-hide success messages after 5 seconds
-            if (type === 'success') {
-                setTimeout(() => {
-                    messageEl.classList.remove('show');
-                }, 5000);
-            }
         }
 
         function setLoading(isLoading) {
             submitBtn.disabled = isLoading;
             if (isLoading) {
-                submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
+                submitBtn.innerHTML = '<span class="spinner"></span>Submitting…';
             } else {
                 submitBtn.textContent = 'Submit Assessment';
             }
         }
 
+        function reportLinkHtml(uri) {
+            if (!uri) {
+                return '<div style="margin-top:8px">No PDF URI returned — use Regenerate PDF below with the assessment ID.</div>';
+            }
+            if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('gs://')) {
+                const href = uri.startsWith('gs://')
+                    ? `https://console.cloud.google.com/storage/browser/_details/${uri.slice(5)}`
+                    : uri;
+                return `<div style="margin-top:8px"><a href="${href}" target="_blank" rel="noopener">Open draft PDF</a></div>`;
+            }
+            if (uri.startsWith('file://')) {
+                return `<div style="margin-top:8px">Draft PDF saved on server: <code>${uri.replace('file://', '')}</code></div>`;
+            }
+            return `<div style="margin-top:8px">Report URI: ${uri}</div>`;
+        }
+
+        function showRegenMessage(html, type) {
+            regenMessageEl.innerHTML = html;
+            regenMessageEl.className = `message ${type} show`;
+            regenMessageEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        async function regenerateReport(assessmentId, { button, onSuccessMessage } = {}) {
+            const id = Number(assessmentId);
+            if (!Number.isInteger(id) || id < 1) {
+                throw new Error('Enter a valid assessment ID');
+            }
+
+            const btn = button || regenBtn;
+            const prevLabel = btn.textContent;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Generating…';
+
+            try {
+                const response = await fetch(`${API_URL}/${id}/report`, { method: 'POST' });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.error || `Report failed (${response.status})`);
+                }
+                const html =
+                    (onSuccessMessage
+                        ? onSuccessMessage(data)
+                        : `✓ PDF ready for assessment #${data.assessment_id}.`) +
+                    reportLinkHtml(data.report_uri || data.report_gcs_uri);
+                return html;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = prevLabel;
+            }
+        }
+
+        const regenBtn = document.getElementById('regenBtn');
+        const regenIdInput = document.getElementById('regenAssessmentId');
+        const regenMessageEl = document.getElementById('regenMessage');
+
+        regenBtn.addEventListener('click', async () => {
+            regenMessageEl.classList.remove('show');
+            try {
+                const html = await regenerateReport(regenIdInput.value.trim(), { button: regenBtn });
+                showRegenMessage(html, 'success');
+            } catch (err) {
+                console.error('Regenerate failed:', err);
+                showRegenMessage(`Error: ${err.message}`, 'error');
+            }
+        });
+
+        let lastSubmittedId = null;
+
+        messageEl.addEventListener('click', async (e) => {
+            const btn = e.target.closest('#successRegenBtn');
+            if (!btn || !lastSubmittedId) return;
+            try {
+                const html = await regenerateReport(lastSubmittedId, {
+                    button: btn,
+                    onSuccessMessage: (data) =>
+                        `✓ PDF refreshed for assessment #${data.assessment_id}.`,
+                });
+                showMessage(
+                    html +
+                    `<div class="inline-actions">` +
+                    `<button type="button" class="secondary-btn" id="successRegenBtn">Regenerate PDF</button>` +
+                    `</div>`,
+                    'success'
+                );
+            } catch (err) {
+                showMessage(`Error regenerating PDF: ${err.message}`, 'error');
+            }
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            // Hide any previous messages
             messageEl.classList.remove('show');
-            
-            // Get form data
-            const formData = {
-                playerName: document.getElementById('playerName').value.trim(),
-                assessmentDate: document.getElementById('assessmentDate').value,
-                trainerName: document.getElementById('trainerName').value.trim(),
-                notes: document.getElementById('notes').value.trim()
-            };
 
-            // Client-side validation
-            if (!formData.playerName) {
+            const playerName = titleCaseName(playerNameInput.value.trim());
+            playerNameInput.value = playerName;
+
+            if (!playerName) {
                 showMessage('Please enter a player name', 'error');
                 return;
             }
-
-            if (!formData.assessmentDate) {
+            if (!assessmentDateInput.value) {
                 showMessage('Please select an assessment date', 'error');
                 return;
             }
+            if (!assessmentType) {
+                showMessage('Looking up prior assessments — wait a moment after entering the player name, then submit.', 'error');
+                await lookupPlayerPriors(playerName);
+                if (!assessmentType) {
+                    showMessage('Could not determine Initial vs Retest. Check the player name and try again.', 'error');
+                    return;
+                }
+            }
+            if (assessmentType === 'retest' && !previousSelect.value) {
+                showMessage('Please confirm which previous assessment to compare against', 'error');
+                return;
+            }
 
-            // Set loading state
+            const formData = {
+                playerName,
+                assessmentDate: assessmentDateInput.value,
+                assessmentType,
+                trainerName: document.getElementById('trainerName').value.trim(),
+                notes: document.getElementById('notes').value.trim(),
+            };
+            if (assessmentType === 'retest') {
+                formData.previousAssessmentId = Number(previousSelect.value);
+            }
+
             setLoading(true);
-
             try {
-                // Submit to API
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(formData)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData),
                 });
-
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Success
+                    const typeLabel = (data.assessment_type || assessmentType || '').toString();
+                    const prettyType = typeLabel
+                        ? typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)
+                        : '';
+                    lastSubmittedId = data.assessment_id;
+                    regenIdInput.value = data.assessment_id;
                     showMessage(
-                        `✓ Assessment submitted successfully! Assessment ID: ${data.assessment_id} for ${data.player}`,
+                        `✓ Assessment #${data.assessment_id} saved for ${data.player}` +
+                        (prettyType ? ` (${prettyType})` : '') +
+                        `.` +
+                        reportLinkHtml(data.report_uri || data.report_gcs_uri) +
+                        `<div class="inline-actions">` +
+                        `<button type="button" class="secondary-btn" id="successRegenBtn">Regenerate PDF</button>` +
+                        `</div>`,
                         'success'
                     );
-                    
-                    // Reset form
                     form.reset();
                     assessmentDateInput.value = today;
-                    
-                    // Reload autocomplete names
+                    resetTypePanel();
                     setTimeout(loadRecentNames, 1000);
                 } else {
-                    // Error from server
                     showMessage(`Error: ${data.error || 'Failed to submit assessment'}`, 'error');
                 }
             } catch (error) {
-                // Network or other error
                 console.error('Submission error:', error);
                 showMessage(
                     'Failed to connect to server. Please check your connection and try again.',
                     'error'
                 );
             } finally {
-                // Remove loading state
                 setLoading(false);
             }
-        });
-
-        // Auto-capitalize player and trainer names
-        document.getElementById('playerName').addEventListener('blur', function() {
-            this.value = this.value.split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                .join(' ');
-        });
-
-        document.getElementById('trainerName').addEventListener('blur', function() {
-            this.value = this.value.split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                .join(' ');
         });
     </script>
 </body>

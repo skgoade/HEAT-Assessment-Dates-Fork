@@ -16,11 +16,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY main.py .
+COPY *.py ./
+
+# Local reports directory (Cloud Run is ephemeral; GCS is source of truth)
+RUN mkdir -p /app/reports
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
+ENV REPORT_LOCAL_DIR=/app/reports
 
 # Expose port
 EXPOSE 8080

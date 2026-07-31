@@ -12,13 +12,15 @@ This system allows hitting trainers to input assessment data that is automatical
 
 ## 📋 Features
 
-- **Simple Assessment Entry**: Minimal required fields (Player Name, Assessment Date)
+- **Simple Assessment Entry**: Static web form for player, date, Initial/Retest, and comparison links
+- **Draft PDF reports**: Header + Blast/HitTrax comparison tables; upload to GCS (M3+)
 - **Auto-Incrementing IDs**: Automatic unique assessment ID generation
 - **Data Linking**: Automatic joins with Blast and HitTrax swing data (±7 days)
 - **Multiple Views**: Pre-built SQL views for different analysis needs
-- **REST API**: Full CRUD operations for assessments
+- **REST API**: Assessment create/read + report regenerate stub
 - **Autocomplete**: Player and trainer name suggestions from history
 - **Progress Tracking**: Built-in assessment numbering and history tracking
+
 
 ## 🗄️ Database Schema
 

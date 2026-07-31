@@ -61,6 +61,14 @@ tmp/
 temp/
 *.tmp
 
+# Generated HEAT PDFs
+reports/
+backend/reports/
+notebooks/reports/
+
+# Local example assets (keep out of git; use GCS / docs links)
+example_hitter_assessment.pdf
+
 # OS files
 Thumbs.db
 .DS_Store

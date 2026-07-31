@@ -1,302 +1,479 @@
+"""
+HEAT Assessment API (Flask).
+
+This is the backend the static assessment form talks to. It:
+  1. Saves assessments into PlayerDev.hitting_assessments
+  2. Lets the form list prior assessments (for previous-date confirm)
+  3. Builds draft PDFs (local and/or GCS) via report_pipeline
+
+Deployed on Google Cloud Run; MySQL credentials come from environment variables
+(see db.get_db_connection).
+"""
+
 import os
+import logging
+from datetime import datetime
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
-from datetime import datetime
-import logging
-# from dotenv import load_dotenv  # Add this line
 
-# # Load environment variables from .env file
-# load_dotenv()  # Add this line
+from db import get_db_connection
 
 app = Flask(__name__)
 
-# Enable CORS for your frontend domain
+# Allow the GCS-hosted HTML form (and local file:// / other origins) to call /api/*.
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["*"],  # Change to your specific domain in production
+        "origins": ["*"],
         "methods": ["POST", "GET", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database configuration from environment variables
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST'),
-    'user': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASS'),
-    'database': os.environ.get('DB_NAME_PROD', 'PlayerDev'),
-    'port': int(os.environ.get('DB_PORT', 3306)),
-    'connect_timeout': 10,
-    'use_pure': True
-}
 
-def get_db_connection():
-    """Create and return a database connection"""
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+# Columns returned by GET endpoints (includes M1 comparison fields).
+ASSESSMENT_SELECT_COLUMNS = """
+    assessment_id,
+    assessment_date,
+    player_name,
+    trainer_name,
+    notes,
+    assessment_type,
+    previous_assessment_id,
+    report_gcs_uri,
+    created_at,
+    updated_at
+"""
+
+
+def _parse_optional_int(value, field_name):
+    """
+    Parse an optional integer from JSON.
+
+    Returns (ok, value_or_None, error_message).
+    Empty / missing → (True, None, None).
+    """
+    if value is None or value == '':
+        return True, None, None
     try:
-        # Connect with the database already specified
-        connection = mysql.connector.connect(**DB_CONFIG)
-        logger.info("Database connection established")
-        return connection
-    except Exception as e:
-        logger.error(f"Database connection failed: {str(e)}")
-        raise
+        return True, int(value), None
+    except (TypeError, ValueError):
+        return False, None, f"{field_name} must be an integer"
+
+
+def serialize_assessment_row(row):
+    """
+    Make a MySQL row JSON-safe.
+
+    mysql.connector returns date/datetime objects; jsonify needs strings.
+    """
+    if not row:
+        return row
+    out = dict(row)
+    if out.get('assessment_date'):
+        out['assessment_date'] = out['assessment_date'].strftime('%Y-%m-%d')
+    if out.get('created_at'):
+        out['created_at'] = out['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+    if out.get('updated_at'):
+        out['updated_at'] = out['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+    return out
+
 
 def validate_assessment_data(data):
-    """Validate incoming hitting assessment form data"""
-    required_fields = ['playerName', 'assessmentDate']
-    
-    # Check required fields
+    """
+    Validate POST body from the static form.
+
+    Required: playerName, assessmentDate, assessmentType (initial | retest).
+    previousAssessmentId is optional (trainer confirms which prior date to compare).
+    baseline is never sent by the form — metrics resolve it as earliest initial.
+
+    On success: data['_previousAssessmentId']
+    """
+    required_fields = ['playerName', 'assessmentDate', 'assessmentType']
+
     for field in required_fields:
         if field not in data or data[field] == '':
             return False, f"Missing required field: {field}"
-    
-    # Validate player name
+
     if len(data['playerName'].strip()) < 2:
         return False, "Player name must be at least 2 characters"
-    
-    # Validate assessment date format
+
     try:
         datetime.strptime(data['assessmentDate'], '%Y-%m-%d')
     except ValueError:
         return False, "Invalid date format. Use YYYY-MM-DD"
-    
-    # Validate trainer name if provided
+
     if 'trainerName' in data and data['trainerName']:
         if len(data['trainerName'].strip()) < 2:
             return False, "Trainer name must be at least 2 characters"
-    
+
+    assessment_type = str(data['assessmentType']).strip().lower()
+    if assessment_type not in ('initial', 'retest'):
+        return False, "assessmentType must be 'initial' or 'retest'"
+    data['assessmentType'] = assessment_type
+
+    ok, previous_id, err = _parse_optional_int(
+        data.get('previousAssessmentId'), 'previousAssessmentId'
+    )
+    if not ok:
+        return False, err
+
+    # Initial assessments have no comparison peers.
+    if assessment_type == 'initial':
+        previous_id = None
+
+    data['_previousAssessmentId'] = previous_id
     return True, None
+
+
+def fetch_assessment_by_id(cursor, assessment_id):
+    """Load one hitting_assessments row (dict cursor) or None."""
+    cursor.execute(
+        f"SELECT {ASSESSMENT_SELECT_COLUMNS} FROM hitting_assessments WHERE assessment_id = %s",
+        (assessment_id,),
+    )
+    return cursor.fetchone()
+
+
+def validate_comparison_peers(cursor, player_name, previous_id):
+    """
+    DB check for retest links: previous ID must exist and match this player.
+    """
+    if previous_id is None:
+        return True, None
+    peer = fetch_assessment_by_id(cursor, previous_id)
+    if not peer:
+        return False, f"previous assessment {previous_id} not found"
+    if peer['player_name'].strip().casefold() != player_name.strip().casefold():
+        return False, f"previous assessment {previous_id} belongs to a different player"
+    return True, None
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint for Cloud Run"""
+    """Cloud Run / load balancer probe — also verifies MySQL is reachable."""
     try:
-        # Test database connection
         conn = get_db_connection()
         conn.close()
         return jsonify({"status": "healthy", "database": "connected"}), 200
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
+        logger.error("Health check failed: %s", e)
         return jsonify({"status": "unhealthy", "error": str(e)}), 503
+
+
+# ---------------------------------------------------------------------------
+# Create assessment (form submit)
+# ---------------------------------------------------------------------------
 
 @app.route('/api/hitting-assessment', methods=['POST', 'OPTIONS'])
 def submit_assessment():
-    """Handle hitting assessment submissions"""
-    
-    # Handle preflight request
+    """
+    Create a hitting_assessments row.
+
+    OPTIONS: browser CORS preflight (empty 204).
+    POST JSON example (retest — only previous is trainer-chosen):
+      {
+        "playerName": "Jason Peele",
+        "assessmentDate": "2026-07-20",
+        "assessmentType": "retest",
+        "previousAssessmentId": 15,
+        "trainerName": "Noah",
+        "notes": "optional"
+      }
+    """
+    # Browsers send OPTIONS before cross-origin POST; answer without hitting the DB.
     if request.method == 'OPTIONS':
         return '', 204
-    
+
     try:
-        # Get JSON data from request
         data = request.get_json()
-        
         if not data:
             return jsonify({"error": "No data provided"}), 400
-        
-        # Validate data
+
         is_valid, error_message = validate_assessment_data(data)
         if not is_valid:
-            logger.warning(f"Validation failed: {error_message}")
+            logger.warning("Validation failed: %s", error_message)
             return jsonify({"error": error_message}), 400
-        
-        # Connect to database
+
+        player_name = data['playerName'].strip()
+        previous_id = data['_previousAssessmentId']
+
         connection = get_db_connection()
-        
         try:
-            with connection.cursor() as cursor:
-                # Prepare SQL query
+            # dictionary=True → rows as dicts (needed by validate_comparison_peers)
+            with connection.cursor(dictionary=True) as cursor:
+                peers_ok, peers_err = validate_comparison_peers(
+                    cursor, player_name, previous_id
+                )
+                if not peers_ok:
+                    return jsonify({"error": peers_err}), 400
+
+                # Baseline is not stored — metrics resolve earliest initial at read time.
                 sql = """
-                    INSERT INTO hitting_assessments 
-                    (assessment_date, player_name, trainer_name, notes)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO hitting_assessments
+                    (assessment_date, player_name, trainer_name, notes,
+                     assessment_type, previous_assessment_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """
-                
-                # Prepare values
                 values = (
                     data['assessmentDate'],
-                    data['playerName'].strip(),
+                    player_name,
                     data.get('trainerName', '').strip() or None,
-                    data.get('notes', '').strip() or None
+                    data.get('notes', '').strip() or None,
+                    data['assessmentType'],
+                    previous_id,
                 )
-                
-                # Execute query
                 cursor.execute(sql, values)
                 connection.commit()
-                
-                # Get the auto-incremented assessment_id
+                # Auto-increment PK assigned by MySQL for this insert
                 assessment_id = cursor.lastrowid
-                
-                logger.info(f"Assessment saved for player: {data['playerName']}, ID: {assessment_id}")
-                
+                logger.info(
+                    "Assessment saved for player: %s, ID: %s, type: %s",
+                    player_name,
+                    assessment_id,
+                    data['assessmentType'],
+                )
+
+                # M3: draft PDF on submit (local file:// or GCS if HEAT_GCS_BUCKET set)
+                report_uri = None
+                try:
+                    from report_pipeline import generate_draft_report
+
+                    row = fetch_assessment_by_id(cursor, assessment_id)
+                    report_uri = generate_draft_report(connection, row)
+                    if report_uri:
+                        cursor.execute(
+                            """
+                            UPDATE hitting_assessments
+                            SET report_gcs_uri = %s
+                            WHERE assessment_id = %s
+                            """,
+                            (report_uri, assessment_id),
+                        )
+                        connection.commit()
+                except Exception as report_err:
+                    logger.exception(
+                        "Assessment %s saved but report failed: %s",
+                        assessment_id,
+                        report_err,
+                    )
+
                 return jsonify({
                     "success": True,
                     "message": "Hitting assessment submitted successfully",
                     "assessment_id": assessment_id,
-                    "player": data['playerName'],
-                    "assessment_date": data['assessmentDate']
+                    "player": player_name,
+                    "assessment_date": data['assessmentDate'],
+                    "assessment_type": data['assessmentType'],
+                    "previous_assessment_id": previous_id,
+                    "report_uri": report_uri,
+                    "report_gcs_uri": report_uri,
                 }), 201
-                
         finally:
+            # Always close even if validation/insert fails after connect
             connection.close()
-            
+
     except mysql.connector.Error as e:
-        logger.error(f"Database error: {str(e)}")
+        logger.error("Database error: %s", e)
         return jsonify({"error": "Database error occurred"}), 500
-        
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error("Unexpected error: %s", e)
         return jsonify({"error": "An unexpected error occurred"}), 500
+
+
+# ---------------------------------------------------------------------------
+# Read assessments (power form autocomplete / retest dropdowns)
+# ---------------------------------------------------------------------------
 
 @app.route('/api/hitting-assessment/<int:assessment_id>', methods=['GET'])
 def get_assessment(assessment_id):
-    """Retrieve a specific hitting assessment by ID"""
+    """Return one assessment by primary key."""
     try:
         connection = get_db_connection()
-        
         try:
             with connection.cursor(dictionary=True) as cursor:
-                sql = """
-                    SELECT 
-                        assessment_id,
-                        assessment_date,
-                        player_name,
-                        trainer_name,
-                        notes,
-                        created_at,
-                        updated_at
-                    FROM hitting_assessments
-                    WHERE assessment_id = %s
-                """
-                
-                cursor.execute(sql, (assessment_id,))
-                result = cursor.fetchone()
-                
+                result = fetch_assessment_by_id(cursor, assessment_id)
                 if not result:
                     return jsonify({"error": "Assessment not found"}), 404
-                
-                # Convert date objects to strings for JSON serialization
-                if result['assessment_date']:
-                    result['assessment_date'] = result['assessment_date'].strftime('%Y-%m-%d')
-                if result['created_at']:
-                    result['created_at'] = result['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                if result['updated_at']:
-                    result['updated_at'] = result['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
-                
-                return jsonify(result), 200
-                
+                return jsonify(serialize_assessment_row(result)), 200
         finally:
             connection.close()
-            
     except Exception as e:
-        logger.error(f"Error retrieving assessment: {str(e)}")
+        logger.error("Error retrieving assessment: %s", e)
         return jsonify({"error": "An error occurred"}), 500
+
 
 @app.route('/api/hitting-assessment/player/<player_name>', methods=['GET'])
 def get_player_assessments(player_name):
-    """Retrieve all assessments for a specific player"""
+    """
+    All assessments for a player (newest first).
+
+    The form calls this after name select to list prior dates (previous confirm).
+    """
     try:
         connection = get_db_connection()
-        
         try:
             with connection.cursor(dictionary=True) as cursor:
-                sql = """
-                    SELECT 
-                        assessment_id,
-                        assessment_date,
-                        player_name,
-                        trainer_name,
-                        notes,
-                        created_at
+                sql = f"""
+                    SELECT {ASSESSMENT_SELECT_COLUMNS}
                     FROM hitting_assessments
-                    WHERE player_name = %s
-                    ORDER BY assessment_date DESC
+                    WHERE LOWER(player_name) = LOWER(%s)
+                    ORDER BY assessment_date DESC, assessment_id DESC
                 """
-                
                 cursor.execute(sql, (player_name,))
-                results = cursor.fetchall()
-                
-                # Convert date objects to strings
-                for result in results:
-                    if result['assessment_date']:
-                        result['assessment_date'] = result['assessment_date'].strftime('%Y-%m-%d')
-                    if result['created_at']:
-                        result['created_at'] = result['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                
+                results = [serialize_assessment_row(r) for r in cursor.fetchall()]
+                # Prefer canonical casing from DB when we have matches
+                canonical = results[0]["player_name"] if results else player_name
                 return jsonify({
-                    "player_name": player_name,
+                    "player_name": canonical,
                     "total_assessments": len(results),
                     "assessments": results
                 }), 200
-                
         finally:
             connection.close()
-            
     except Exception as e:
-        logger.error(f"Error retrieving player assessments: {str(e)}")
+        logger.error("Error retrieving player assessments: %s", e)
         return jsonify({"error": "An error occurred"}), 500
+
 
 @app.route('/api/hitting-assessment/recent', methods=['GET'])
 def get_recent_assessments():
-    """Retrieve recent assessments (last 30 days)"""
+    """
+    Recent assessments (default last 30 days).
+
+    Used for form autocomplete of player names. Optional ?limit=N (default 50).
+    """
     try:
         limit = request.args.get('limit', 50, type=int)
-        
         connection = get_db_connection()
-        
         try:
             with connection.cursor(dictionary=True) as cursor:
-                sql = """
-                    SELECT 
-                        assessment_id,
-                        assessment_date,
-                        player_name,
-                        trainer_name,
-                        notes,
-                        created_at
+                sql = f"""
+                    SELECT {ASSESSMENT_SELECT_COLUMNS}
                     FROM hitting_assessments
                     WHERE assessment_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                     ORDER BY assessment_date DESC, created_at DESC
                     LIMIT %s
                 """
-                
                 cursor.execute(sql, (limit,))
-                results = cursor.fetchall()
-                
-                # Convert date objects to strings
-                for result in results:
-                    if result['assessment_date']:
-                        result['assessment_date'] = result['assessment_date'].strftime('%Y-%m-%d')
-                    if result['created_at']:
-                        result['created_at'] = result['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                
+                results = [serialize_assessment_row(r) for r in cursor.fetchall()]
                 return jsonify({
                     "total": len(results),
                     "assessments": results
                 }), 200
-                
         finally:
             connection.close()
-            
     except Exception as e:
-        logger.error(f"Error retrieving recent assessments: {str(e)}")
+        logger.error("Error retrieving recent assessments: %s", e)
         return jsonify({"error": "An error occurred"}), 500
+
+
+# ---------------------------------------------------------------------------
+# Metrics (M2) + report generation (M3)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/hitting-assessment/<int:assessment_id>/metrics', methods=['GET'])
+def get_hitting_assessment_metrics(assessment_id):
+    """
+    Return Blast + HitTrax aggregates for this assessment (calendar day only).
+
+    Also includes previous (stored) and baseline (auto earliest initial) blocks.
+    """
+    try:
+        import report_metrics
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+            bundle = report_metrics.build_report_bundle_json(connection, row)
+            return jsonify({
+                "assessment_id": assessment_id,
+                "metrics": bundle,
+            }), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("Error building metrics for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/hitting-assessment/<int:assessment_id>/report', methods=['POST'])
+def regenerate_hitting_assessment_report(assessment_id):
+    """
+    Build draft PDF for this assessment (metrics → ReportLab → local / GCS).
+
+    Stores the resulting URI on hitting_assessments.report_gcs_uri.
+    Without HEAT_GCS_BUCKET, returns a local file:// path.
+    """
+    try:
+        from report_pipeline import generate_draft_report
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+
+            uri = generate_draft_report(connection, row)
+            if not uri:
+                return jsonify({"error": "Report generation returned no URI"}), 500
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE hitting_assessments
+                    SET report_gcs_uri = %s
+                    WHERE assessment_id = %s
+                    """,
+                    (uri, assessment_id),
+                )
+                connection.commit()
+
+            return jsonify({
+                "assessment_id": assessment_id,
+                "status": "ok",
+                "report_uri": uri,
+                "report_gcs_uri": uri,
+            }), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("Error generating report for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Error handlers + local run
+# ---------------------------------------------------------------------------
 
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Endpoint not found"}), 404
 
+
 @app.errorhandler(500)
 def internal_error(error):
-    logger.error(f"Internal server error: {str(error)}")
+    logger.error("Internal server error: %s", error)
     return jsonify({"error": "Internal server error"}), 500
 
+
 if __name__ == '__main__':
-    # For local development only
+    # Local only — production uses gunicorn (see Dockerfile).
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=False)

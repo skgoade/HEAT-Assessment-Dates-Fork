@@ -24,7 +24,7 @@ SELECT
     -- Time Between
     DATEDIFF(current.assessment_date, first.assessment_date) as days_since_first,
     
-    -- Blast Metrics Comparison (Averages within ±7 days of each assessment)
+    -- Blast Metrics Comparison (averages on each assessment calendar day)
     AVG(CASE WHEN b_current.assessment_id = current.assessment_id 
         THEN b_current.bat_speed END) as current_bat_speed,
     AVG(CASE WHEN b_first.assessment_id = first.assessment_id 

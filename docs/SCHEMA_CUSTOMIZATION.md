@@ -11,30 +11,40 @@ The hitting assessment system links assessment dates with your existing swing da
 Before customizing, gather this information about your database:
 
 ### Blast Motion Table
-- **Table name**: ____________________
-- **Player name column**: ____________________
-- **Date column**: ____________________
-- **Timestamp column** (for matching with HitTrax): ____________________
+
+- **Table name**: blast_swing_metrics_PROD_shadow
+- **Player name column**: player_name
+- **Date column**: created_date
+- **Timestamp column** (for matching with HitTrax): sync_timestamp
 - **Metric columns**: List all columns you want in reports
+
+
 
 ### HitTrax Table
-- **Table name**: ____________________
-- **Player name column**: ____________________
+
+- **Table name**: HitTraxSwingSilver
+- **Player name column**: UserName
 - **Date column**: ____________________
-- **Timestamp column** (for matching with Blast): ____________________
+- **Timestamp column** (for matching with Blast): TS
 - **Metric columns**: List all columns you want in reports
 
+
+
 ## 🔧 Step-by-Step Customization
+
+
 
 ### Step 1: Identify Your Table Names
 
 Open `deployment/schema.sql` and find these references:
 
 **Default names used in schema:**
+
 - `blast_swing_data` - Replace with your Blast table name
 - `hittrax_swing_data` - Replace with your HitTrax table name
 
 **Find and replace:**
+
 ```sql
 -- Change this:
 FROM blast_swing_data bsd
@@ -49,7 +59,11 @@ FROM hittrax_swing_data hsd
 FROM hittrax_results hsd
 ```
 
+
+
 ### Step 2: Update Column Names
+
+
 
 #### Player Name Column
 
@@ -65,6 +79,8 @@ ON ha.player_name = bsd.player_name
 ON ha.player_name = bsd.athlete_name  -- or your column name
 ```
 
+
+
 #### Date Columns
 
 **Default:** `session_date`
@@ -78,6 +94,8 @@ bsd.workout_date
 bsd.test_date
 bsd.date
 ```
+
+
 
 #### Timestamp Columns
 
@@ -93,11 +111,16 @@ ON bsd.ts = hsd.ts
 ON bsd.timestamp = hsd.timestamp  -- or your column names
 ```
 
+
+
 ### Step 3: Update Metric Columns
+
+
 
 #### Blast Metrics
 
 **Default columns in assessment_blast_view:**
+
 ```sql
 bsd.bat_speed,
 bsd.peak_hand_speed,
@@ -116,6 +139,7 @@ bsd.swing_count
 **Example customization:**
 
 If your Blast table has different column names:
+
 ```sql
 -- Original
 bsd.bat_speed,
@@ -128,9 +152,12 @@ bsd.swing_speed,  -- new column
 bsd.efficiency,   -- new column
 ```
 
+
+
 #### HitTrax Metrics
 
 **Default columns in assessment_hittrax_view:**
+
 ```sql
 hsd.exit_velocity,
 hsd.launch_angle,
@@ -152,32 +179,32 @@ hsd.barrel_percentage
 
 ### Step 4: Customize Date Ranges
 
-**Default:** ±7 days from assessment date
+**Default (product decision):** assessment **calendar day only**  
+(`DATE(session) = assessment_date`). Trainers flag one assessment day, not a multi-day window.
 
-To change the linking window:
+The Python metrics layer (`backend/report_metrics.py`) always uses the assessment calendar day only.
+
+If you still use SQL views and need a wider experimental window:
 
 ```sql
--- Current:
+-- Assessment day only (recommended):
+AND DATE(bsd.session_date) = ha.assessment_date
+
+-- Legacy ±7 days:
 AND ABS(DATEDIFF(bsd.session_date, ha.assessment_date)) <= 7
 
 -- For ±3 days:
 AND ABS(DATEDIFF(bsd.session_date, ha.assessment_date)) <= 3
-
--- For ±14 days:
-AND ABS(DATEDIFF(bsd.session_date, ha.assessment_date)) <= 14
-
--- For only AFTER assessment (next 7 days):
-AND DATEDIFF(bsd.session_date, ha.assessment_date) BETWEEN 0 AND 7
-
--- For only BEFORE assessment (previous 7 days):
-AND DATEDIFF(bsd.session_date, ha.assessment_date) BETWEEN -7 AND 0
 ```
+
+
 
 ## 📝 Example Customization
 
 Here's a complete example of customizing the Blast view:
 
 ### Original View
+
 ```sql
 CREATE OR REPLACE VIEW assessment_blast_view AS
 SELECT 
@@ -194,7 +221,10 @@ LEFT JOIN blast_swing_data bsd
     AND ABS(DATEDIFF(bsd.session_date, ha.assessment_date)) <= 7;
 ```
 
+
+
 ### Customized View
+
 ```sql
 CREATE OR REPLACE VIEW assessment_blast_view AS
 SELECT 
@@ -219,11 +249,14 @@ LEFT JOIN blast_metrics bm
     AND ABS(DATEDIFF(bm.test_date, ha.assessment_date)) <= 7;
 ```
 
+
+
 ## 🧪 Testing Your Changes
 
 After customizing the schema, test each view:
 
 ### Test 1: Check View Creation
+
 ```sql
 -- Show all views
 SHOW FULL TABLES WHERE table_type = 'VIEW';
@@ -236,7 +269,10 @@ SHOW FULL TABLES WHERE table_type = 'VIEW';
 -- player_assessment_history
 ```
 
+
+
 ### Test 2: Query Each View
+
 ```sql
 -- Test Blast view
 SELECT * FROM assessment_blast_view LIMIT 5;
@@ -248,7 +284,10 @@ SELECT * FROM assessment_hittrax_view LIMIT 5;
 SELECT * FROM assessment_combined_view LIMIT 5;
 ```
 
+
+
 ### Test 3: Check Data Linking
+
 ```sql
 -- Create a test assessment
 INSERT INTO hitting_assessments (assessment_date, player_name)
@@ -261,23 +300,34 @@ ORDER BY assessment_id DESC
 LIMIT 1;
 ```
 
+
+
 ## 🚨 Common Issues
 
+
+
 ### Issue 1: "Unknown column" error
+
 **Problem:** Column name doesn't exist in your table
 
 **Solution:** Check your actual column names:
+
 ```sql
 DESCRIBE blast_swing_data;  -- or your table name
 ```
 
+
+
 ### Issue 2: View returns no data
+
 **Possible causes:**
+
 1. Player names don't match exactly (check for extra spaces, capitalization)
 2. No swing data exists in the date range
 3. Date column is wrong type or NULL
 
 **Debug:**
+
 ```sql
 -- Check player names in both tables
 SELECT DISTINCT player_name FROM hitting_assessments;
@@ -290,12 +340,16 @@ WHERE player_name = 'John Smith'
 ORDER BY session_date DESC LIMIT 10;
 ```
 
+
+
 ### Issue 3: Timestamp join returns no matches
+
 **Problem:** Blast and HitTrax timestamps don't match exactly
 
 **Solutions:**
 
 Option A: Match by date and swing sequence instead of timestamp:
+
 ```sql
 LEFT JOIN hittrax_swing_data hsd 
     ON bsd.player_name = hsd.player_name
@@ -304,11 +358,14 @@ LEFT JOIN hittrax_swing_data hsd
 ```
 
 Option B: Use time window matching:
+
 ```sql
 LEFT JOIN hittrax_swing_data hsd 
     ON bsd.player_name = hsd.player_name
     AND ABS(TIMESTAMPDIFF(SECOND, bsd.timestamp, hsd.timestamp)) <= 2
 ```
+
+
 
 ## 📋 Customization Checklist
 
@@ -326,7 +383,11 @@ Use this checklist when modifying the schema:
 - [ ] Verified data linking works
 - [ ] Checked that metrics appear correctly
 
+
+
 ## 💡 Advanced Customizations
+
+
 
 ### Add Calculated Metrics
 
@@ -338,6 +399,8 @@ Use this checklist when modifying the schema:
 (hsd.exit_velocity / bsd.bat_speed) as exit_velo_efficiency,
 ```
 
+
+
 ### Add Filters
 
 ```sql
@@ -348,6 +411,8 @@ WHERE bsd.bat_speed >= 50
 -- Exclude specific swing types
 WHERE hsd.result != 'Miss'
 ```
+
+
 
 ### Add Aggregations
 
@@ -370,28 +435,28 @@ LEFT JOIN hittrax_swing_data hsd ON ...
 GROUP BY ha.assessment_id, ha.player_name, ha.assessment_date;
 ```
 
+
+
 ## 🎓 Need More Help?
 
 1. **Review your table structure:**
-   ```sql
+  ```sql
    DESCRIBE your_blast_table;
    DESCRIBE your_hittrax_table;
-   ```
-
+  ```
 2. **Check sample data:**
-   ```sql
+  ```sql
    SELECT * FROM your_blast_table LIMIT 1;
    SELECT * FROM your_hittrax_table LIMIT 1;
-   ```
-
+  ```
 3. **Test joins manually:**
-   ```sql
+  ```sql
    SELECT *
    FROM hitting_assessments ha
    LEFT JOIN your_blast_table bsd 
        ON ha.player_name = bsd.your_player_column
    LIMIT 5;
-   ```
+  ```
 
 Remember: The views are just SELECT statements. You can always drop and recreate them:
 
@@ -399,3 +464,4 @@ Remember: The views are just SELECT statements. You can always drop and recreate
 DROP VIEW IF EXISTS assessment_blast_view;
 -- Then create again with your customizations
 ```
+

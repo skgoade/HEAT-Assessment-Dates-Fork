@@ -53,7 +53,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --memory 512Mi \
     --cpu 1 \
     --max-instances 10 \
-    --set-env-vars "DB_PORT=3306" \
+    --set-env-vars "DB_PORT=3306,HEAT_GCS_BUCKET=heat-assessment-reports,HEAT_GCS_PREFIX=heat-assessments/,REPORT_LOCAL_DIR=/app/reports" \
     --set-secrets "DB_HOST=DB_HOST:latest,DB_USER=DB_USER:latest,DB_PASS=DB_PASS:latest,DB_NAME_PROD=DB_NAME_PROD:latest"
 
 # Get the service URL

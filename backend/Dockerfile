@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY *.py ./
+COPY assets/ ./assets/
 
 # Local reports directory (Cloud Run is ephemeral; GCS is source of truth)
 RUN mkdir -p /app/reports

@@ -72,3 +72,8 @@ example_hitter_assessment.pdf
 # OS files
 Thumbs.db
 .DS_Store
+
+# Internal planning (keep local)
+docs/STATIC_SITE_*_PLAN.md
+docs/STATIC_SITE_*_OVERVIEW.md
+

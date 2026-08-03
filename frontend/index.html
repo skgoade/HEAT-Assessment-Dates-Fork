@@ -445,6 +445,18 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label>Trainer visuals (optional)</label>
+                <p class="section-intro" style="margin: 0 0 12px;">
+                    Screenshots or photos for the PDF (HitTrax/VALD exports, mechanics stills).
+                    PNG/JPEG/WebP, up to 4&nbsp;MB each, max 6.
+                </p>
+                <div id="visualRows"></div>
+                <button type="button" class="secondary-btn" id="addVisualBtn" style="margin-top: 8px;">
+                    + Add image
+                </button>
+            </div>
+
             <button type="submit" id="submitBtn">
                 Submit Assessment
             </button>
@@ -456,6 +468,7 @@
             <h2 id="regenHeading">Regenerate PDF</h2>
             <p class="section-intro">
                 Already have an assessment ID? Generate a new draft PDF without creating another assessment.
+                You can also attach visuals here, then regenerate.
             </p>
             <div class="form-group">
                 <label for="regenAssessmentId">
@@ -471,6 +484,11 @@
                 >
                 <div class="helper-text">From a prior submit success message or the database</div>
             </div>
+            <div class="form-group">
+                <label for="regenVisualFile">Add visuals (optional)</label>
+                <input type="file" id="regenVisualFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+                <input type="text" id="regenVisualCaption" placeholder="Caption for all new images (optional)" style="margin-top:8px;">
+            </div>
             <button type="button" class="secondary-btn" id="regenBtn">
                 Generate PDF
             </button>
@@ -482,6 +500,75 @@
         // Local testing: use the localhost line and comment the Cloud Run URL.
         // const API_URL = 'http://localhost:8080/api/hitting-assessment';
         const API_URL = 'https://hitting-assessment-api-973347833854.us-east4.run.app/api/hitting-assessment';
+
+        const MAX_VISUALS = 6;
+        const visualRowsEl = document.getElementById('visualRows');
+        const addVisualBtn = document.getElementById('addVisualBtn');
+
+        function addVisualRow() {
+            if (visualRowsEl.querySelectorAll('.visual-row').length >= MAX_VISUALS) {
+                addVisualBtn.disabled = true;
+                return;
+            }
+            const row = document.createElement('div');
+            row.className = 'visual-row';
+            row.style.cssText = 'display:grid; gap:8px; margin-bottom:12px; padding:12px; border:1px solid #e5e7eb; border-radius:8px;';
+            row.innerHTML = `
+                <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
+                <select class="visual-slot">
+                    <option value="other">Slot: Other</option>
+                    <option value="mechanics">Slot: Mechanics</option>
+                    <option value="vald">Slot: VALD</option>
+                    <option value="hittrax">Slot: HitTrax</option>
+                </select>
+                <input type="text" class="visual-caption" placeholder="Caption (optional)">
+                <button type="button" class="secondary-btn visual-remove" style="justify-self:start;">Remove</button>
+            `;
+            row.querySelector('.visual-remove').addEventListener('click', () => {
+                row.remove();
+                addVisualBtn.disabled = visualRowsEl.querySelectorAll('.visual-row').length >= MAX_VISUALS;
+            });
+            visualRowsEl.appendChild(row);
+            addVisualBtn.disabled = visualRowsEl.querySelectorAll('.visual-row').length >= MAX_VISUALS;
+        }
+
+        addVisualBtn.addEventListener('click', addVisualRow);
+        addVisualRow();
+
+        function collectVisualUploads() {
+            const items = [];
+            visualRowsEl.querySelectorAll('.visual-row').forEach((row) => {
+                const fileInput = row.querySelector('.visual-file');
+                const file = fileInput && fileInput.files && fileInput.files[0];
+                if (!file) return;
+                items.push({
+                    file,
+                    caption: (row.querySelector('.visual-caption').value || '').trim(),
+                    slot: row.querySelector('.visual-slot').value || 'other',
+                });
+            });
+            return items;
+        }
+
+        async function uploadVisuals(assessmentId, items, { regenerate = true } = {}) {
+            if (!items.length) return null;
+            const body = new FormData();
+            items.forEach((item, i) => {
+                body.append('file', item.file, item.file.name);
+                body.append(`caption${i}`, item.caption || '');
+                body.append(`slot${i}`, item.slot || 'other');
+            });
+            body.append('regenerate', regenerate ? '1' : '0');
+            const response = await fetch(`${API_URL}/${assessmentId}/attachments`, {
+                method: 'POST',
+                body,
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Upload failed (${response.status})`);
+            }
+            return data;
+        }
 
         const form = document.getElementById('assessmentForm');
         const messageEl = document.getElementById('message');
@@ -716,7 +803,25 @@
         regenBtn.addEventListener('click', async () => {
             regenMessageEl.classList.remove('show');
             try {
-                const html = await regenerateReport(regenIdInput.value.trim(), { button: regenBtn });
+                const id = regenIdInput.value.trim();
+                const files = Array.from(document.getElementById('regenVisualFile').files || []);
+                const caption = (document.getElementById('regenVisualCaption').value || '').trim();
+                if (files.length) {
+                    const items = files.slice(0, MAX_VISUALS).map((file) => ({
+                        file,
+                        caption,
+                        slot: 'other',
+                    }));
+                    const uploadData = await uploadVisuals(id, items, { regenerate: true });
+                    showRegenMessage(
+                        `✓ Uploaded ${uploadData.uploaded?.length || 0} image(s) and refreshed PDF.` +
+                        reportLinkHtml(uploadData.report_uri || uploadData.report_gcs_uri),
+                        'success'
+                    );
+                    document.getElementById('regenVisualFile').value = '';
+                    return;
+                }
+                const html = await regenerateReport(id, { button: regenBtn });
                 showRegenMessage(html, 'success');
             } catch (err) {
                 console.error('Regenerate failed:', err);
@@ -802,17 +907,38 @@
                         : '';
                     lastSubmittedId = data.assessment_id;
                     regenIdInput.value = data.assessment_id;
+
+                    let reportUri = data.report_uri || data.report_gcs_uri;
+                    let visualNote = '';
+                    const visuals = collectVisualUploads();
+                    if (visuals.length) {
+                        try {
+                            const uploadData = await uploadVisuals(data.assessment_id, visuals, {
+                                regenerate: true,
+                            });
+                            reportUri = uploadData.report_uri || uploadData.report_gcs_uri || reportUri;
+                            visualNote = ` · ${uploadData.uploaded?.length || 0} visual(s) attached`;
+                        } catch (uploadErr) {
+                            console.error(uploadErr);
+                            visualNote = ` · visuals upload failed: ${uploadErr.message}`;
+                        }
+                    }
+
                     showMessage(
                         `✓ Assessment #${data.assessment_id} saved for ${data.player}` +
                         (prettyType ? ` (${prettyType})` : '') +
                         `.` +
-                        reportLinkHtml(data.report_uri || data.report_gcs_uri) +
+                        visualNote +
+                        reportLinkHtml(reportUri) +
                         `<div class="inline-actions">` +
                         `<button type="button" class="secondary-btn" id="successRegenBtn">Regenerate PDF</button>` +
                         `</div>`,
                         'success'
                     );
                     form.reset();
+                    visualRowsEl.innerHTML = '';
+                    addVisualBtn.disabled = false;
+                    addVisualRow();
                     assessmentDateInput.value = today;
                     resetTypePanel();
                     setTimeout(loadRecentNames, 1000);

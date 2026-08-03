@@ -21,6 +21,8 @@ import mysql.connector
 from db import get_db_connection
 
 app = Flask(__name__)
+# Trainer image uploads (multipart) — several files up to ~4 MB each
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 
 # Allow the GCS-hosted HTML form (and local file:// / other origins) to call /api/*.
 CORS(app, resources={
@@ -455,6 +457,150 @@ def regenerate_hitting_assessment_report(assessment_id):
             connection.close()
     except Exception as e:
         logger.exception("Error generating report for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route(
+    "/api/hitting-assessment/<int:assessment_id>/attachments",
+    methods=["POST", "GET", "OPTIONS"],
+)
+def assessment_attachments(assessment_id):
+    """
+    Trainer visual context images.
+
+    GET  — list metadata for this assessment.
+    POST multipart/form-data:
+      files: image fields named file / file0 / images (repeatable)
+      captions: caption0, caption1, … matching file order
+      slots:    slot0, slot1, … optional (mechanics|vald|other)
+      regenerate: "1" (default) to rebuild PDF after upload
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+
+    try:
+        import attachments as attachments_mod
+        from report_pipeline import generate_draft_report
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+
+            if request.method == "GET":
+                rows = attachments_mod.list_attachments(connection, assessment_id)
+                out = []
+                for r in rows:
+                    item = dict(r)
+                    if item.get("created_at") and hasattr(item["created_at"], "strftime"):
+                        item["created_at"] = item["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+                    out.append(item)
+                return jsonify({"assessment_id": assessment_id, "attachments": out}), 200
+
+            # Collect uploaded files (support several field names)
+            uploaded = []
+            for key in request.files:
+                for storage in request.files.getlist(key):
+                    if storage and storage.filename:
+                        uploaded.append(storage)
+
+            if not uploaded:
+                return jsonify({"error": "No image files provided"}), 400
+            if len(uploaded) > attachments_mod.MAX_FILES:
+                return jsonify({
+                    "error": f"At most {attachments_mod.MAX_FILES} images per request"
+                }), 400
+
+            existing = attachments_mod.list_attachments(connection, assessment_id)
+            sort_base = len(existing)
+            saved = []
+            errors = []
+
+            for i, storage in enumerate(uploaded):
+                raw = storage.read()
+                ct = storage.mimetype or "application/octet-stream"
+                caption = (
+                    request.form.get(f"caption{i}")
+                    or request.form.get(f"captions[{i}]")
+                    or request.form.get("caption")
+                    or ""
+                )
+                slot = (
+                    request.form.get(f"slot{i}")
+                    or request.form.get(f"slots[{i}]")
+                    or request.form.get("slot")
+                    or "other"
+                )
+                try:
+                    uri, local_path = attachments_mod.store_image_bytes(
+                        assessment_id=assessment_id,
+                        player_name=row["player_name"],
+                        assessment_date=row.get("assessment_date"),
+                        raw=raw,
+                        content_type=ct,
+                        slot=str(slot).strip() or "other",
+                        original_name=storage.filename or "",
+                    )
+                    aid = attachments_mod.save_attachment_row(
+                        connection,
+                        assessment_id=assessment_id,
+                        slot=str(slot).strip() or "other",
+                        caption=caption,
+                        gcs_uri=uri,
+                        local_path=local_path,
+                        content_type=ct,
+                        sort_order=sort_base + i,
+                    )
+                    saved.append({
+                        "attachment_id": aid,
+                        "gcs_uri": uri,
+                        "caption": caption or None,
+                        "slot": slot,
+                    })
+                except Exception as e:
+                    logger.exception("Attachment upload failed")
+                    errors.append({"file": storage.filename, "error": str(e)})
+
+            if not saved and errors:
+                return jsonify({"error": "All uploads failed", "details": errors}), 400
+
+            report_uri = None
+            regenerate = request.form.get("regenerate", "1") not in ("0", "false", "False")
+            if regenerate and saved:
+                try:
+                    report_uri = generate_draft_report(connection, row)
+                    if report_uri:
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                """
+                                UPDATE hitting_assessments
+                                SET report_gcs_uri = %s
+                                WHERE assessment_id = %s
+                                """,
+                                (report_uri, assessment_id),
+                            )
+                            connection.commit()
+                except Exception as report_err:
+                    logger.exception(
+                        "Attachments saved but report regen failed for %s: %s",
+                        assessment_id,
+                        report_err,
+                    )
+
+            return jsonify({
+                "success": True,
+                "assessment_id": assessment_id,
+                "uploaded": saved,
+                "errors": errors,
+                "report_uri": report_uri,
+                "report_gcs_uri": report_uri,
+            }), 201
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("Attachments endpoint failed for %s", assessment_id)
         return jsonify({"error": str(e)}), 500
 
 

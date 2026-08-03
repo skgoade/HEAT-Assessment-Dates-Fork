@@ -25,6 +25,15 @@ def generate_draft_report(conn, assessment_row: dict) -> Optional[str]:
     Object keys are player/date/id for easy later lookup (Noah path feedback).
     """
     bundle = report_metrics.build_report_bundle(conn, assessment_row)
+    try:
+        import attachments as attachments_mod
+
+        aid = assessment_row["assessment_id"]
+        bundle["trainer_visuals"] = attachments_mod.attachments_for_pdf(conn, aid)
+    except Exception:
+        logger.exception("Failed loading trainer visuals for PDF")
+        bundle["trainer_visuals"] = []
+
     local_path = report_pdf.build_pdf(bundle)
 
     player = assessment_row["player_name"]

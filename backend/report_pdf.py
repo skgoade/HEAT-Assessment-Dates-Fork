@@ -528,7 +528,7 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
     vald_cards = report_charts.build_vald_chart_images(vald_series)
     if vald_cards:
         story.append(PageBreak())
-        story.append(Paragraph("VALD Visuals", section))
+        story.append(Paragraph("VALD ForceDecks", section))
         card_order = (
             "imtp_force_trend",
             "imtp_rfd150_bilat",
@@ -548,6 +548,43 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
             img.hAlign = "CENTER"
             card_imgs.append(img)
         _append_image_grid(story, card_imgs, col_width=3.55 * inch)
+
+    # --- Trainer visuals (uploaded context images) ---
+    trainer_visuals = bundle.get("trainer_visuals") or []
+    if trainer_visuals:
+        story.append(PageBreak())
+        story.append(Paragraph("Trainer Visuals", section))
+        caption_style = ParagraphStyle(
+            "TrainerCaption",
+            parent=styles["Normal"],
+            fontSize=8,
+            leading=10,
+            textColor=MUTED,
+            alignment=1,
+            spaceAfter=8,
+        )
+        cells: list = []
+        for item in trainer_visuals:
+            raw = item.get("bytes")
+            if not raw:
+                continue
+            try:
+                        img = Image(BytesIO(raw), width=3.3 * inch)
+                        img.hAlign = "CENTER"
+            except Exception:
+                continue
+            cap = (item.get("caption") or "").strip()
+            slot = (item.get("slot") or "").strip()
+            label_bits = []
+            if slot and slot not in ("other", "context"):
+                label_bits.append(slot.replace("_", " ").title())
+            if cap:
+                label_bits.append(escape(cap))
+            block: list = [img]
+            if label_bits:
+                block.append(Paragraph(" — ".join(label_bits), caption_style))
+            cells.append(KeepTogether(block))
+        _append_image_grid(story, cells, col_width=3.5 * inch)
 
     doc.build(story)
     return output_path

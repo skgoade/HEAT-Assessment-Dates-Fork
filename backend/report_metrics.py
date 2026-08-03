@@ -158,6 +158,7 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
     Prefer raw ingest (hittrax_plays + hittrax_session). Use HitTrax **Velo**
     (exit speed) not EBV1 — EBV1 includes negatives/zeros and is not report EV.
     Only rows with Velo > 0 (measured contact). Convert SI → mph / feet.
+    Include HorzAngle / PBH / PBV / Intersect1–3 for PDF charts (raw plays only).
     Fall back to silver tables (already unit-converted) if the join path fails.
     """
     mps_to_mph = 2.23694
@@ -168,6 +169,12 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
             p.Velo * {mps_to_mph} AS ev,
             p.Elv AS launch_angle,
             p.Dist * {m_to_ft} AS distance,
+            p.HorzAngle AS horz_angle,
+            p.PBH AS pbh,
+            p.PBV AS pbv,
+            p.Intersect1 AS intersect1,
+            p.Intersect2 AS intersect2,
+            p.Intersect3 AS intersect3,
             p.TS
         FROM hittrax_plays p
         INNER JOIN hittrax_session s
@@ -177,12 +184,18 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
           AND p.Velo > 0
         """,
         """
-        SELECT Velo AS ev, Elv AS launch_angle, Dist AS distance, TS
+        SELECT
+            Velo AS ev, Elv AS launch_angle, Dist AS distance,
+            NULL AS horz_angle, NULL AS pbh, NULL AS pbv,
+            NULL AS intersect1, NULL AS intersect2, NULL AS intersect3, TS
         FROM HitTraxSwingSilver
         WHERE UserName = %s AND TS BETWEEN %s AND %s AND Velo > 0
         """,
         """
-        SELECT Velo AS ev, Elv AS launch_angle, Dist AS distance, TS
+        SELECT
+            Velo AS ev, Elv AS launch_angle, Dist AS distance,
+            NULL AS horz_angle, NULL AS pbh, NULL AS pbv,
+            NULL AS intersect1, NULL AS intersect2, NULL AS intersect3, TS
         FROM RBI_HitTraxSwingSilver
         WHERE UserName = %s AND TS BETWEEN %s AND %s AND Velo > 0
         """,
@@ -197,6 +210,35 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
         except Exception as e:
             logger.warning("HitTrax query failed: %s", e)
     return []
+
+
+def hittrax_contacts_for_charts(rows: list[dict]) -> list[dict[str, Any]]:
+    """Slim contact points for PDF charts (JSON-serializable floats / None)."""
+    contacts: list[dict[str, Any]] = []
+    for r in rows:
+        def _f(key: str) -> Optional[float]:
+            v = r.get(key)
+            if v is None:
+                return None
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+
+        contacts.append(
+            {
+                "ev": _f("ev"),
+                "launch_angle": _f("launch_angle"),
+                "distance": _f("distance"),
+                "horz_angle": _f("horz_angle"),
+                "pbh": _f("pbh"),
+                "pbv": _f("pbv"),
+                "intersect1": _f("intersect1"),
+                "intersect2": _f("intersect2"),
+                "intersect3": _f("intersect3"),
+            }
+        )
+    return contacts
 
 
 def aggregate_blast(rows: list[dict]) -> dict[str, Any]:
@@ -266,6 +308,9 @@ def _serialize_side(side: Optional[dict]) -> Optional[dict]:
     if side is None:
         return None
     out = dict(side)
+    # Keep metrics API payloads small — chart points stay PDF-only
+    out.pop("hittrax_contacts", None)
+    out.pop("vald_series", None)
     for key in ("start_ts", "end_ts"):
         val = out.get(key)
         if isinstance(val, datetime):
@@ -273,6 +318,149 @@ def _serialize_side(side: Optional[dict]) -> Optional[dict]:
     if out.get("assessment_date") and hasattr(out["assessment_date"], "strftime"):
         out["assessment_date"] = out["assessment_date"].strftime("%Y-%m-%d")
     return out
+
+
+def _vald_daily_series(
+    conn,
+    table: str,
+    metric_cols: list[str],
+    player_name: str,
+    as_of: date,
+) -> list[dict[str, Any]]:
+    """
+    One row per calendar day (MAX of each metric) through as_of inclusive.
+    Missing columns are skipped quietly.
+    """
+    if not metric_cols:
+        return []
+    # Probe which columns exist
+    try:
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(f"SHOW COLUMNS FROM `{table}`")
+            existing = {r["Field"] for r in cur.fetchall()}
+    except Exception as e:
+        logger.warning("VALD column probe failed %s: %s", table, e)
+        return []
+
+    cols = [c for c in metric_cols if c in existing]
+    if not cols:
+        return []
+
+    select_parts = ["DATE(recordedEST) AS session_date"] + [
+        f"MAX(`{c}`) AS `{c}`" for c in cols
+    ]
+    sql = f"""
+        SELECT {", ".join(select_parts)}
+        FROM `{table}`
+        WHERE athleteName = %s
+          AND recordedEST <= %s
+        GROUP BY DATE(recordedEST)
+        ORDER BY session_date ASC
+    """
+    end_ts = datetime.combine(as_of, time(23, 59, 59))
+    try:
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(sql, (player_name, end_ts))
+            rows = cur.fetchall() or []
+    except Exception as e:
+        logger.warning("VALD series query failed %s: %s", table, e)
+        return []
+
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        day = r.get("session_date")
+        if hasattr(day, "strftime"):
+            day_s = day.strftime("%Y-%m-%d")
+        else:
+            day_s = str(day)[:10] if day else None
+        point: dict[str, Any] = {"date": day_s}
+        for c in cols:
+            v = r.get(c)
+            if v is None:
+                point[c] = None
+            else:
+                try:
+                    point[c] = float(v)
+                except (TypeError, ValueError):
+                    point[c] = None
+        out.append(point)
+    return out
+
+
+def vald_series_for_charts(conn, player_name: str, assessment_date: Any) -> dict[str, Any]:
+    """
+    Historical daily bests + limb columns for Looker-style VALD PDF cards.
+    Window: all trials for the athlete through the assessment date.
+    """
+    as_of = _as_date(assessment_date)
+    return {
+        "imtp": _vald_daily_series(
+            conn,
+            "VALD_FD_IMTP",
+            [
+                "Peak Vertical Force / BM",
+                "Peak Vertical Force",
+                "Peak Vertical Force (Left)",
+                "Peak Vertical Force (Right)",
+                "Peak Vertical Force Asym (%)",
+                "RFD - 100ms",
+                "RFD - 100ms (Left)",
+                "RFD - 100ms (Right)",
+                "RFD - 100ms Asym (%)",
+                "RFD - 150ms",
+                "RFD - 150ms (Left)",
+                "RFD - 150ms (Right)",
+                "RFD - 150ms Asym (%)",
+            ],
+            player_name,
+            as_of,
+        ),
+        "hj": _vald_daily_series(
+            conn,
+            "VALD_FD_HJ",
+            [
+                "Best RSI (Jump Height/Contact Time)",
+                "Mean RSI (Jump Height/Contact Time)",
+                "Best Jump Height (Flight Time)",
+                "Best Peak Force",
+                "Best Peak Force (Left)",
+                "Best Peak Force (Right)",
+                "Best Peak Force (Asym)",
+            ],
+            player_name,
+            as_of,
+        ),
+        "cmj": _vald_daily_series(
+            conn,
+            "VALD_FD_CMJ",
+            [
+                "Jump Height (Flight Time)",
+                "RSI-modified",
+                "Peak Power / BM",
+                "Eccentric Braking RFD",
+                "Eccentric Braking RFD (Left)",
+                "Eccentric Braking RFD (Right)",
+                "Eccentric Braking RFD Asym (%)",
+                "Concentric Duration",
+            ],
+            player_name,
+            as_of,
+        ),
+        "sj": _vald_daily_series(
+            conn,
+            "VALD_FD_SJ",
+            [
+                "Jump Height (Flight Time)",
+                "Peak Power / BM",
+                "Concentric RFD",
+                "Concentric RFD (Left)",
+                "Concentric RFD (Right)",
+                "Concentric RFD Asym (%)",
+            ],
+            player_name,
+            as_of,
+        ),
+    }
 
 
 def _vald_best(conn, table: str, metric_col: str, player_name: str, start: datetime, end: datetime) -> Optional[float]:
@@ -355,23 +543,28 @@ def aggregate_vald(conn, player_name: str, start: datetime, end: datetime) -> di
     }
 
 
-def metrics_for_assessment(conn, row: dict) -> dict[str, Any]:
+def metrics_for_assessment(conn, row: dict, *, include_chart_series: bool = False) -> dict[str, Any]:
     """Blast + HitTrax + VALD aggregates for a single hitting_assessments row."""
     start, end = _window_bounds(row)
     player = row["player_name"]
     blast_rows = _blast_rows(conn, player, start, end)
     hittrax_rows = _hittrax_rows(conn, player, start, end)
-    return {
+    out: dict[str, Any] = {
         "assessment_id": row["assessment_id"],
         "player_name": player,
         "assessment_type": row.get("assessment_type"),
         "assessment_date": row.get("assessment_date"),
+        "notes": row.get("notes"),
         "start_ts": start,
         "end_ts": end,
         "blast": aggregate_blast(blast_rows),
         "hittrax": aggregate_hittrax(hittrax_rows),
+        "hittrax_contacts": hittrax_contacts_for_charts(hittrax_rows) if include_chart_series else [],
         "vald": aggregate_vald(conn, player, start, end),
     }
+    if include_chart_series:
+        out["vald_series"] = vald_series_for_charts(conn, player, row.get("assessment_date"))
+    return out
 
 
 def build_report_bundle(conn, current: dict) -> dict[str, Any]:
@@ -382,10 +575,12 @@ def build_report_bundle(conn, current: dict) -> dict[str, Any]:
     baseline is auto-resolved (earliest initial for the player).
     """
     peers = get_comparison_peers(conn, current)
+    current_metrics = metrics_for_assessment(conn, current, include_chart_series=True)
     return {
-        "current": metrics_for_assessment(conn, current),
+        "current": current_metrics,
         "previous": metrics_for_assessment(conn, peers["previous"]) if peers["previous"] else None,
         "baseline": metrics_for_assessment(conn, peers["baseline"]) if peers["baseline"] else None,
+        "notes": current.get("notes") or current_metrics.get("notes"),
     }
 
 

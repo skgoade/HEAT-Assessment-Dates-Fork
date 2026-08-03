@@ -6,3 +6,4 @@ reportlab==4.2.5
 google-cloud-storage==2.18.2
 requests==2.32.3
 tzdata==2024.2
+matplotlib>=3.9.2

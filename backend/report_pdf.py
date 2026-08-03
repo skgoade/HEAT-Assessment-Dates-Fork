@@ -4,9 +4,12 @@ from __future__ import annotations
 import os
 import re
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
+from xml.sax.saxutils import escape
 
+import report_charts
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -121,6 +124,32 @@ def _comparison_table(
     )
     flow.append(table)
     return flow
+
+
+def _append_image_grid(story: list, images: list, col_width: float = 3.5 * inch) -> None:
+    """Append ReportLab Images in rows of up to 2."""
+    if not images:
+        return
+    rows: list = []
+    for i in range(0, len(images), 2):
+        chunk = images[i : i + 2]
+        if len(chunk) == 1:
+            chunk = chunk + [""]
+        rows.append(chunk)
+    table = Table(rows, colWidths=[col_width, col_width])
+    table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    story.append(table)
 
 
 def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
@@ -385,6 +414,43 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
         )
     )
 
+    # --- Batted Ball Visuals (HitTrax charts) + coach notes ---
+    contacts = current.get("hittrax_contacts") or []
+    chart_images = report_charts.build_hittrax_chart_images(contacts)
+    notes_text = (bundle.get("notes") or current.get("notes") or "").strip()
+    if chart_images or notes_text:
+        story.append(PageBreak())
+        story.append(Paragraph("Batted Ball Visuals", section))
+        # Primary HitTrax-style charts first, then EV×LA / spray
+        chart_order = (
+            ("zone_ev", 3.2 * inch),
+            ("zone_la", 3.2 * inch),
+            ("ev_depth", 3.2 * inch),
+            ("ev_la", 3.2 * inch),
+            ("spray", 3.2 * inch),
+        )
+        chart_cells: list = []
+        for key, width in chart_order:
+            png = chart_images.get(key)
+            if not png:
+                continue
+            img = Image(BytesIO(png), width=width, height=width * 0.95 if key.startswith("zone") or key == "ev_depth" else width * 0.78)
+            img.hAlign = "CENTER"
+            chart_cells.append(img)
+        _append_image_grid(story, chart_cells)
+        if notes_text:
+            notes_style = ParagraphStyle(
+                "CoachNotes",
+                parent=styles["Normal"],
+                fontSize=9,
+                leading=12,
+                textColor=MUTED,
+                spaceBefore=4,
+            )
+            story.append(Paragraph("<b>Coach notes</b>", section))
+            html = escape(notes_text).replace("\n", "<br/>")
+            story.append(Paragraph(html, notes_style))
+
     # --- VALD ForceDecks (best of day) — start on next page with header+table together ---
     story.append(PageBreak())
     story.append(
@@ -456,6 +522,32 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
             )
         )
     )
+
+    # --- VALD Visuals (Looker-style cards) ---
+    vald_series = current.get("vald_series") or {}
+    vald_cards = report_charts.build_vald_chart_images(vald_series)
+    if vald_cards:
+        story.append(PageBreak())
+        story.append(Paragraph("VALD Visuals", section))
+        card_order = (
+            "imtp_force_trend",
+            "imtp_rfd150_bilat",
+            "hj_rsi_trend",
+            "hj_force_bilat",
+            "cmj_jh_trend",
+            "cmj_rsi_trend",
+            "sj_jh_trend",
+            "sj_rfd_bilat",
+        )
+        card_imgs: list = []
+        for key in card_order:
+            png = vald_cards.get(key)
+            if not png:
+                continue
+            img = Image(BytesIO(png), width=3.45 * inch, height=1.85 * inch)
+            img.hAlign = "CENTER"
+            card_imgs.append(img)
+        _append_image_grid(story, card_imgs, col_width=3.55 * inch)
 
     doc.build(story)
     return output_path

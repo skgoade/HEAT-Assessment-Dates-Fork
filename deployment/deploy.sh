@@ -5,8 +5,12 @@
 
 set -e  # Exit on error
 
+# Configuration
+PROJECT_ID="norse-coral-441421-r9"
+REGION="us-east4"
 # New service name — do NOT reuse hitting-assessment-api (legacy static dates site)
 SERVICE_NAME="heat-assessment-api"
+IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
 echo "Starting deployment of HEAT Assessment API (${SERVICE_NAME})..."
 
@@ -24,37 +28,9 @@ if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" &> /dev/n
     exit 1
 fi
 
-# Project + region from Secret Manager (format: project:region:instance)
-# Fallback project only used to read the secret if gcloud has no project set yet.
-LOOKUP_PROJECT="${GOOGLE_CLOUD_PROJECT:-norse-coral-441421-r9}"
-echo "Reading INSTANCE_CONNECTION_NAME from Secret Manager (project ${LOOKUP_PROJECT})..."
-INSTANCE_CONNECTION_NAME="$(
-  gcloud secrets versions access latest \
-    --secret=INSTANCE_CONNECTION_NAME \
-    --project="${LOOKUP_PROJECT}" \
-    | tr -d '\r\n'
-)"
-
-if [[ -z "${INSTANCE_CONNECTION_NAME}" ]]; then
-  echo "Error: INSTANCE_CONNECTION_NAME secret is empty"
-  exit 1
-fi
-
-# Expect project:region:cloudsql-instance
-IFS=':' read -r PROJECT_ID REGION CLOUDSQL_INSTANCE <<< "${INSTANCE_CONNECTION_NAME}"
-if [[ -z "${PROJECT_ID}" || -z "${REGION}" || -z "${CLOUDSQL_INSTANCE}" ]]; then
-  echo "Error: INSTANCE_CONNECTION_NAME must be project:region:instance"
-  echo "Got: ${INSTANCE_CONNECTION_NAME}"
-  exit 1
-fi
-
-IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
-
-echo "Using PROJECT_ID=${PROJECT_ID} REGION=${REGION} (instance ${CLOUDSQL_INSTANCE})"
-
 # Set the project
 echo "Setting GCP project to: ${PROJECT_ID}"
-gcloud config set project "${PROJECT_ID}"
+gcloud config set project ${PROJECT_ID}
 
 # Enable required APIs
 echo "Enabling required APIs..."
@@ -65,15 +41,15 @@ gcloud services enable secretmanager.googleapis.com
 # Build the container image
 echo "Building container image..."
 cd backend
-gcloud builds submit --tag "${IMAGE_NAME}"
+gcloud builds submit --tag ${IMAGE_NAME}
 cd ..
 
 # Deploy to Cloud Run (creates a NEW service if it does not exist)
 echo "Deploying to Cloud Run as ${SERVICE_NAME}..."
-gcloud run deploy "${SERVICE_NAME}" \
-    --image "${IMAGE_NAME}" \
+gcloud run deploy ${SERVICE_NAME} \
+    --image ${IMAGE_NAME} \
     --platform managed \
-    --region "${REGION}" \
+    --region ${REGION} \
     --allow-unauthenticated \
     --memory 1Gi \
     --cpu 1 \
@@ -82,12 +58,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --set-secrets "DB_HOST=DB_HOST:latest,DB_USER=DB_USER:latest,DB_PASS=DB_PASS:latest,DB_NAME_PROD=DB_NAME_PROD:latest"
 
 # Get the service URL
-SERVICE_URL="$(
-  gcloud run services describe "${SERVICE_NAME}" \
-    --platform managed \
-    --region "${REGION}" \
-    --format 'value(status.url)'
-)"
+SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --platform managed --region ${REGION} --format 'value(status.url)')
 
 echo ""
 echo "Deployment complete!"

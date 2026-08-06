@@ -20,7 +20,8 @@ ALLOWED_CONTENT_TYPES = {
     "image/gif": ".gif",
 }
 MAX_BYTES = 4 * 1024 * 1024  # 4 MB per file
-MAX_FILES = 6
+# 5 mechanics phases + several optional extras
+MAX_FILES = 12
 
 
 def _slug(name: str) -> str:
@@ -84,6 +85,48 @@ def save_attachment_row(
         )
         conn.commit()
         return int(cur.lastrowid)
+
+
+def delete_attachments(
+    conn,
+    assessment_id: int,
+    attachment_ids: Optional[list[int]] = None,
+) -> list[int]:
+    """
+    Remove attachment rows (plus local/GCS copies) for an assessment.
+
+    Passing attachment_ids=None deletes every attachment on the assessment.
+    Returns the ids that were deleted.
+    """
+    rows = list_attachments(conn, assessment_id)
+    if attachment_ids is not None:
+        wanted = {int(i) for i in attachment_ids}
+        rows = [r for r in rows if int(r["attachment_id"]) in wanted]
+    if not rows:
+        return []
+
+    deleted: list[int] = []
+    for row in rows:
+        local = row.get("local_path")
+        if local:
+            try:
+                Path(local).unlink(missing_ok=True)
+            except Exception:
+                logger.warning("Could not remove local attachment %s", local)
+        gcs_upload.delete_object(row.get("gcs_uri") or "")
+        deleted.append(int(row["attachment_id"]))
+
+    placeholders = ", ".join(["%s"] * len(deleted))
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""
+            DELETE FROM assessment_attachments
+            WHERE assessment_id = %s AND attachment_id IN ({placeholders})
+            """,
+            (assessment_id, *deleted),
+        )
+        conn.commit()
+    return deleted
 
 
 def store_image_bytes(

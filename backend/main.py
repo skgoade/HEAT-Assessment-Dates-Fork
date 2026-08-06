@@ -13,6 +13,7 @@ Deployed on Google Cloud Run; MySQL credentials come from environment variables
 import os
 import logging
 from datetime import datetime
+from typing import Optional
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -28,7 +29,7 @@ app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 CORS(app, resources={
     r"/api/*": {
         "origins": ["*"],
-        "methods": ["POST", "GET", "OPTIONS"],
+        "methods": ["POST", "GET", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
@@ -48,6 +49,10 @@ ASSESSMENT_SELECT_COLUMNS = """
     player_name,
     trainer_name,
     notes,
+    video_analysis_url,
+    used_blast,
+    used_hittrax,
+    used_vald,
     assessment_type,
     previous_assessment_id,
     report_gcs_uri,
@@ -69,6 +74,31 @@ def _parse_optional_int(value, field_name):
         return True, int(value), None
     except (TypeError, ValueError):
         return False, None, f"{field_name} must be an integer"
+
+
+def _parse_bool(value, default=True):
+    """Parse JSON booleans while keeping omitted legacy fields enabled."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _normalize_video_url(value) -> Optional[str]:
+    """Return a cleaned http(s) URL or None. Empty is allowed."""
+    if value is None:
+        return None
+    url = str(value).strip()
+    if not url:
+        return None
+    if url.startswith("http://") or url.startswith("https://"):
+        return url[:1024]
+    if url.startswith("youtu.be/") or url.startswith("www."):
+        return ("https://" + url)[:1024]
+    return None
 
 
 def serialize_assessment_row(row):
@@ -133,6 +163,18 @@ def validate_assessment_data(data):
         previous_id = None
 
     data['_previousAssessmentId'] = previous_id
+    data['_usedBlast'] = _parse_bool(data.get('usedBlast'))
+    data['_usedHittrax'] = _parse_bool(data.get('usedHittrax'))
+    data['_usedVald'] = _parse_bool(data.get('usedVald'))
+
+    raw_video = data.get('videoAnalysisUrl')
+    if raw_video is not None and str(raw_video).strip():
+        video_url = _normalize_video_url(raw_video)
+        if not video_url:
+            return False, "videoAnalysisUrl must be an http(s) link"
+        data['_videoAnalysisUrl'] = video_url
+    else:
+        data['_videoAnalysisUrl'] = None
     return True, None
 
 
@@ -226,14 +268,20 @@ def submit_assessment():
                 sql = """
                     INSERT INTO hitting_assessments
                     (assessment_date, player_name, trainer_name, notes,
+                     video_analysis_url,
+                     used_blast, used_hittrax, used_vald,
                      assessment_type, previous_assessment_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 values = (
                     data['assessmentDate'],
                     player_name,
                     data.get('trainerName', '').strip() or None,
                     data.get('notes', '').strip() or None,
+                    data['_videoAnalysisUrl'],
+                    data['_usedBlast'],
+                    data['_usedHittrax'],
+                    data['_usedVald'],
                     data['assessmentType'],
                     previous_id,
                 )
@@ -419,6 +467,9 @@ def regenerate_hitting_assessment_report(assessment_id):
     """
     Build draft PDF for this assessment (metrics → ReportLab → local / GCS).
 
+    Optional JSON may update notes, videoAnalysisUrl, and
+    usedBlast/usedHittrax/usedVald before generation. Omitted fields retain
+    their stored values.
     Stores the resulting URI on hitting_assessments.report_gcs_uri.
     Without HEAT_GCS_BUCKET, returns a local file:// path.
     """
@@ -431,6 +482,45 @@ def regenerate_hitting_assessment_report(assessment_id):
                 row = fetch_assessment_by_id(cursor, assessment_id)
                 if not row:
                     return jsonify({"error": "Assessment not found"}), 404
+
+                data = request.get_json(silent=True) or {}
+                updates = []
+                values = []
+                if "notes" in data:
+                    updates.append("notes = %s")
+                    values.append(str(data.get("notes") or "").strip() or None)
+                if "videoAnalysisUrl" in data:
+                    raw_video = data.get("videoAnalysisUrl")
+                    if raw_video is not None and str(raw_video).strip():
+                        video_url = _normalize_video_url(raw_video)
+                        if not video_url:
+                            return jsonify({
+                                "error": "videoAnalysisUrl must be an http(s) link"
+                            }), 400
+                    else:
+                        video_url = None
+                    updates.append("video_analysis_url = %s")
+                    values.append(video_url)
+                for json_key, column in (
+                    ("usedBlast", "used_blast"),
+                    ("usedHittrax", "used_hittrax"),
+                    ("usedVald", "used_vald"),
+                ):
+                    if json_key in data:
+                        updates.append(f"{column} = %s")
+                        values.append(_parse_bool(data[json_key]))
+                if updates:
+                    values.append(assessment_id)
+                    cursor.execute(
+                        f"""
+                        UPDATE hitting_assessments
+                        SET {", ".join(updates)}
+                        WHERE assessment_id = %s
+                        """,
+                        tuple(values),
+                    )
+                    connection.commit()
+                    row = fetch_assessment_by_id(cursor, assessment_id)
 
             uri = generate_draft_report(connection, row)
             if not uri:
@@ -460,9 +550,32 @@ def regenerate_hitting_assessment_report(assessment_id):
         return jsonify({"error": str(e)}), 500
 
 
+def _regenerate_and_store(connection, row, assessment_id, generate_draft_report):
+    """Rebuild the PDF and record its URI; never raises."""
+    try:
+        report_uri = generate_draft_report(connection, row)
+        if report_uri:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE hitting_assessments
+                    SET report_gcs_uri = %s
+                    WHERE assessment_id = %s
+                    """,
+                    (report_uri, assessment_id),
+                )
+                connection.commit()
+        return report_uri
+    except Exception as report_err:
+        logger.exception(
+            "Report regen failed for %s: %s", assessment_id, report_err
+        )
+        return None
+
+
 @app.route(
     "/api/hitting-assessment/<int:assessment_id>/attachments",
-    methods=["POST", "GET", "OPTIONS"],
+    methods=["POST", "GET", "DELETE", "OPTIONS"],
 )
 def assessment_attachments(assessment_id):
     """
@@ -472,8 +585,13 @@ def assessment_attachments(assessment_id):
     POST multipart/form-data:
       files: image fields named file / file0 / images (repeatable)
       captions: caption0, caption1, … matching file order
-      slots:    slot0, slot1, … optional (mechanics|vald|other)
+      slots:    slot0, slot1, … optional
+                (load_phase|load_position|stride_phase|launch_position|impact|
+                 blast|vald|hittrax|other)
+      replace:  "1" to remove existing images before saving these
       regenerate: "1" (default) to rebuild PDF after upload
+    DELETE ?ids=3,4 (or ?all=1) — remove images, then rebuild the PDF
+      unless regenerate=0.
     """
     if request.method == "OPTIONS":
         return "", 204
@@ -499,6 +617,36 @@ def assessment_attachments(assessment_id):
                     out.append(item)
                 return jsonify({"assessment_id": assessment_id, "attachments": out}), 200
 
+            if request.method == "DELETE":
+                ids_param = (request.args.get("ids") or "").strip()
+                delete_all = request.args.get("all") in ("1", "true", "True")
+                if not ids_param and not delete_all:
+                    return jsonify({"error": "Pass ids=1,2 or all=1"}), 400
+                target_ids = None
+                if not delete_all:
+                    try:
+                        target_ids = [
+                            int(part) for part in ids_param.split(",") if part.strip()
+                        ]
+                    except ValueError:
+                        return jsonify({"error": "ids must be integers"}), 400
+
+                removed = attachments_mod.delete_attachments(
+                    connection, assessment_id, target_ids
+                )
+                report_uri = None
+                if request.args.get("regenerate", "1") not in ("0", "false", "False"):
+                    report_uri = _regenerate_and_store(
+                        connection, row, assessment_id, generate_draft_report
+                    )
+                return jsonify({
+                    "success": True,
+                    "assessment_id": assessment_id,
+                    "deleted": removed,
+                    "report_uri": report_uri,
+                    "report_gcs_uri": report_uri,
+                }), 200
+
             # Collect uploaded files (support several field names)
             uploaded = []
             for key in request.files:
@@ -512,6 +660,10 @@ def assessment_attachments(assessment_id):
                 return jsonify({
                     "error": f"At most {attachments_mod.MAX_FILES} images per request"
                 }), 400
+
+            replaced = []
+            if request.form.get("replace") in ("1", "true", "True"):
+                replaced = attachments_mod.delete_attachments(connection, assessment_id)
 
             existing = attachments_mod.list_attachments(connection, assessment_id)
             sort_base = len(existing)
@@ -569,30 +721,15 @@ def assessment_attachments(assessment_id):
             report_uri = None
             regenerate = request.form.get("regenerate", "1") not in ("0", "false", "False")
             if regenerate and saved:
-                try:
-                    report_uri = generate_draft_report(connection, row)
-                    if report_uri:
-                        with connection.cursor() as cursor:
-                            cursor.execute(
-                                """
-                                UPDATE hitting_assessments
-                                SET report_gcs_uri = %s
-                                WHERE assessment_id = %s
-                                """,
-                                (report_uri, assessment_id),
-                            )
-                            connection.commit()
-                except Exception as report_err:
-                    logger.exception(
-                        "Attachments saved but report regen failed for %s: %s",
-                        assessment_id,
-                        report_err,
-                    )
+                report_uri = _regenerate_and_store(
+                    connection, row, assessment_id, generate_draft_report
+                )
 
             return jsonify({
                 "success": True,
                 "assessment_id": assessment_id,
                 "uploaded": saved,
+                "replaced": replaced,
                 "errors": errors,
                 "report_uri": report_uri,
                 "report_gcs_uri": report_uri,

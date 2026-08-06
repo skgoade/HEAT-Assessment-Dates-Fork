@@ -185,6 +185,171 @@
             cursor: not-allowed;
         }
 
+        .visual-row {
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .visual-row-fields {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: stretch;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .visual-row .visual-file,
+        .visual-row .visual-slot,
+        .visual-row .visual-caption {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            box-sizing: border-box;
+            text-align: left;
+        }
+
+        .visual-row .visual-caption::placeholder {
+            text-align: left;
+        }
+
+        .visual-row .visual-order {
+            font-weight: 700;
+            color: #7fc4ff;
+            min-width: 1.75rem;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+        }
+
+        .mechanics-row .mechanics-label {
+            font-weight: 700;
+            color: #7fc4ff;
+            min-width: 7.5rem;
+            max-width: 7.5rem;
+            font-size: 13px;
+            line-height: 1.25;
+            display: flex;
+            align-items: center;
+            flex: 0 0 auto;
+        }
+
+        .visual-row-actions {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            align-items: center;
+            flex: 0 0 auto;
+            align-self: stretch;
+            gap: 0;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            margin: 0;
+            flex: 0 0 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: #7fc4ff;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .icon-btn:hover {
+            background: rgba(127, 196, 255, 0.15);
+            border-color: #7fc4ff;
+        }
+
+        .icon-btn.visual-remove {
+            color: #ff8a8a;
+            border-color: rgba(255, 138, 138, 0.5);
+        }
+
+        .icon-btn.visual-remove:hover {
+            background: rgba(255, 138, 138, 0.15);
+            border-color: #ff8a8a;
+        }
+
+        .existing-attachments {
+            margin-top: 12px;
+        }
+
+        .tool-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 24px;
+            margin-top: 8px;
+        }
+
+        .tool-options label {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .tool-options input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .attachment-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .attachment-row .attachment-info {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .attachment-row .attachment-select {
+            width: auto;
+            margin: 0;
+            flex: 0 0 auto;
+        }
+
+        .attachment-row .attachment-slot {
+            font-weight: 700;
+            color: #7fc4ff;
+        }
+
+        .attachment-row .attachment-caption {
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        .attachment-row .attachment-caption.missing {
+            color: #ff8a8a;
+            font-style: italic;
+        }
+
         .divider {
             margin: 36px 0 28px;
             border: none;
@@ -202,6 +367,31 @@
             font-size: 14px;
             line-height: 1.5;
             margin-bottom: 20px;
+        }
+
+        .regen-mode-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 24px;
+            margin: 8px 0 16px;
+        }
+
+        .regen-mode-options label {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-weight: 500;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .regen-mode-options input[type="radio"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .regen-lookup-panel[hidden] {
+            display: none !important;
         }
 
         .inline-actions {
@@ -432,6 +622,34 @@
             </div>
 
             <div class="form-group">
+                <label>Tools used</label>
+                <div class="tool-options">
+                    <label><input type="checkbox" id="usedBlast" checked> Blast Motion</label>
+                    <label><input type="checkbox" id="usedHittrax" checked> HitTrax</label>
+                    <label><input type="checkbox" id="usedVald" checked> VALD</label>
+                </div>
+                <div class="helper-text">
+                    Unchecked tools and their associated visuals are omitted from the PDF.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="videoAnalysisUrl">
+                    Video Analysis Link
+                </label>
+                <input
+                    type="url"
+                    id="videoAnalysisUrl"
+                    name="videoAnalysisUrl"
+                    placeholder="https://youtu.be/..."
+                    autocomplete="off"
+                >
+                <div class="helper-text">
+                    Optional link to Blast/video analysis (shown on the PDF header)
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label for="notes">
                     Assessment Notes
                 </label>
@@ -441,14 +659,27 @@
                     placeholder="Enter any observations, goals, or specific focuses for this assessment..."
                 ></textarea>
                 <div class="helper-text">
-                    Optional notes about the assessment (e.g., areas of focus, observations, goals)
+                    Optional notes (supports basic Markdown:
+                    <code>**bold**</code>, <code>*italic*</code>,
+                    <code>`code`</code>, <code>- bullets</code>,
+                    <code>1. lists</code>, <code># headings</code>)
                 </div>
             </div>
 
             <div class="form-group">
-                <label>Trainer visuals (optional)</label>
+                <label>Mechanics photos (optional)</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
-                    Screenshots or photos for the PDF (HitTrax/VALD exports, mechanics stills).
+                    Still frames for Load Phase, Load Position, Stride Phase, Launch Position, and Impact
+                    (as in the hand-built assessment docs). PNG/JPEG/WebP, up to 4&nbsp;MB each.
+                </p>
+                <div id="mechanicsRows"></div>
+            </div>
+
+            <div class="form-group">
+                <label>Other trainer visuals (optional)</label>
+                <p class="section-intro" style="margin: 0 0 12px;">
+                    Extra screenshots (HitTrax/VALD exports, etc.).
+                    Use ↑ ↓ for PDF order among these extras (top = first).
                     PNG/JPEG/WebP, up to 4&nbsp;MB each, max 6.
                 </p>
                 <div id="visualRows"></div>
@@ -467,27 +698,119 @@
         <section class="regen-section" aria-labelledby="regenHeading">
             <h2 id="regenHeading">Regenerate PDF</h2>
             <p class="section-intro">
-                Already have an assessment ID? Generate a new draft PDF without creating another assessment.
-                You can also attach visuals here, then regenerate.
+                Find an existing assessment by ID or by player + assessment number, then refresh the PDF.
+                You can also update notes, tools, and visuals here before generating.
             </p>
             <div class="form-group">
-                <label for="regenAssessmentId">
-                    Assessment ID<span class="required">*</span>
-                </label>
-                <input
-                    type="text"
-                    id="regenAssessmentId"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="e.g. 3"
-                    autocomplete="off"
-                >
-                <div class="helper-text">From a prior submit success message or the database</div>
+                <label>Find assessment by</label>
+                <div class="regen-mode-options">
+                    <label>
+                        <input type="radio" name="regenLookupMode" value="id" checked>
+                        Assessment ID
+                    </label>
+                    <label>
+                        <input type="radio" name="regenLookupMode" value="player">
+                        Player name + assessment number
+                    </label>
+                </div>
+            </div>
+            <div id="regenByIdPanel" class="regen-lookup-panel">
+                <div class="form-group">
+                    <label for="regenAssessmentId">
+                        Assessment ID<span class="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="regenAssessmentId"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="e.g. 3"
+                        autocomplete="off"
+                    >
+                    <div class="helper-text">From a prior submit success message or the database</div>
+                </div>
+            </div>
+            <div id="regenByPlayerPanel" class="regen-lookup-panel" hidden>
+                <div class="form-group">
+                    <label for="regenPlayerName">
+                        Player Name<span class="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="regenPlayerName"
+                        placeholder="Enter player name"
+                        list="playerNames"
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="form-group">
+                    <label for="regenVisit">
+                        Assessment<span class="required">*</span>
+                    </label>
+                    <select id="regenVisit" disabled>
+                        <option value="">Look up a player first</option>
+                    </select>
+                    <div id="regenLookupStatus" class="helper-text"></div>
+                </div>
             </div>
             <div class="form-group">
-                <label for="regenVisualFile">Add visuals (optional)</label>
-                <input type="file" id="regenVisualFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
-                <input type="text" id="regenVisualCaption" placeholder="Caption for all new images (optional)" style="margin-top:8px;">
+                <label>Tools used</label>
+                <div class="tool-options">
+                    <label><input type="checkbox" id="regenUsedBlast" checked> Blast Motion</label>
+                    <label><input type="checkbox" id="regenUsedHittrax" checked> HitTrax</label>
+                    <label><input type="checkbox" id="regenUsedVald" checked> VALD</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="regenVideoUrl">Video Analysis Link</label>
+                <input
+                    type="url"
+                    id="regenVideoUrl"
+                    placeholder="https://youtu.be/..."
+                    autocomplete="off"
+                >
+            </div>
+            <div class="form-group">
+                <label for="regenNotes">Assessment Notes</label>
+                <textarea
+                    id="regenNotes"
+                    placeholder="Update observations, goals, or areas of focus for this PDF..."
+                ></textarea>
+                <div class="helper-text">
+                    Load the assessment below to view its saved notes and tool selections.
+                    Notes support basic Markdown (<code>**bold**</code>, <code>*italic*</code>,
+                    lists, headings).
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Images already attached</label>
+                <p class="section-intro" style="margin: 0 0 12px;">
+                    Notes, tools, and images load automatically once an assessment is
+                    selected above. Check any image to remove duplicates or ones uploaded
+                    without captions.
+                </p>
+                <button type="button" class="secondary-btn" id="loadAttachmentsBtn">
+                    Reload from saved assessment
+                </button>
+                <div id="existingAttachments" class="existing-attachments"></div>
+            </div>
+            <div class="form-group">
+                <label>Mechanics photos (optional)</label>
+                <p class="section-intro" style="margin: 0 0 12px;">
+                    Load Phase → Impact stills for this assessment.
+                </p>
+                <div id="regenMechanicsRows"></div>
+            </div>
+            <div class="form-group">
+                <label>Other visuals (optional)</label>
+                <p class="section-intro" style="margin: 0 0 12px;">
+                    Use ↑ ↓ to set PDF order among extras.
+                    PNG/JPEG/WebP, up to 4&nbsp;MB each, max 6.
+                </p>
+                <div id="regenVisualRows"></div>
+                <button type="button" class="secondary-btn" id="regenAddVisualBtn" style="margin-top: 8px;">
+                    + Add image
+                </button>
             </div>
             <button type="button" class="secondary-btn" id="regenBtn">
                 Generate PDF
@@ -497,47 +820,127 @@
     </div>
 
     <script>
-        // Local testing: use the localhost line and comment the Cloud Run URL.
-        // const API_URL = 'http://localhost:8080/api/hitting-assessment';
-        const API_URL = 'https://hitting-assessment-api-973347833854.us-east4.run.app/api/hitting-assessment';
+        // Local testing:
+        const API_URL = 'http://localhost:8080/api/hitting-assessment';
+        // Prod: new Cloud Run service heat-assessment-api (not legacy hitting-assessment-api).
+        // After deploy, paste URL from deploy.sh, e.g.:
+        // const API_URL = 'https://heat-assessment-api-XXXX.us-east4.run.app/api/hitting-assessment';
+        // Legacy (do not use for this work):
+        // const API_URL = 'https://hitting-assessment-api-973347833854.us-east4.run.app/api/hitting-assessment';
 
         const MAX_VISUALS = 6;
+        const MECHANICS_PHASES = [
+            { slot: 'load_phase', label: 'Load Phase' },
+            { slot: 'load_position', label: 'Load Position' },
+            { slot: 'stride_phase', label: 'Stride Phase' },
+            { slot: 'launch_position', label: 'Launch Position' },
+            { slot: 'impact', label: 'Impact' },
+        ];
         const visualRowsEl = document.getElementById('visualRows');
         const addVisualBtn = document.getElementById('addVisualBtn');
+        const regenVisualRowsEl = document.getElementById('regenVisualRows');
+        const regenAddVisualBtn = document.getElementById('regenAddVisualBtn');
+        const mechanicsRowsEl = document.getElementById('mechanicsRows');
+        const regenMechanicsRowsEl = document.getElementById('regenMechanicsRows');
 
-        function addVisualRow() {
-            if (visualRowsEl.querySelectorAll('.visual-row').length >= MAX_VISUALS) {
-                addVisualBtn.disabled = true;
+        function refreshVisualOrderLabels(container) {
+            container.querySelectorAll('.visual-row').forEach((row, idx) => {
+                const badge = row.querySelector('.visual-order');
+                if (badge) badge.textContent = `#${idx + 1}`;
+            });
+            const addBtn = container === visualRowsEl ? addVisualBtn : regenAddVisualBtn;
+            if (addBtn) {
+                addBtn.disabled = container.querySelectorAll('.visual-row').length >= MAX_VISUALS;
+            }
+        }
+
+        function moveVisualRow(row, direction) {
+            const container = row.parentElement;
+            if (direction < 0 && row.previousElementSibling) {
+                container.insertBefore(row, row.previousElementSibling);
+            } else if (direction > 0 && row.nextElementSibling) {
+                container.insertBefore(row.nextElementSibling, row);
+            }
+            refreshVisualOrderLabels(container);
+        }
+
+        function initMechanicsRows(container) {
+            container.innerHTML = '';
+            MECHANICS_PHASES.forEach((phase) => {
+                const row = document.createElement('div');
+                row.className = 'visual-row mechanics-row';
+                row.dataset.slot = phase.slot;
+                row.innerHTML = `
+                    <span class="mechanics-label">${phase.label}</span>
+                    <div class="visual-row-fields">
+                        <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
+                        <input type="text" class="visual-caption" placeholder="Caption (optional)">
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function addVisualRow(container, addBtn) {
+            if (container.querySelectorAll('.visual-row').length >= MAX_VISUALS) {
+                addBtn.disabled = true;
                 return;
             }
             const row = document.createElement('div');
             row.className = 'visual-row';
-            row.style.cssText = 'display:grid; gap:8px; margin-bottom:12px; padding:12px; border:1px solid #e5e7eb; border-radius:8px;';
             row.innerHTML = `
-                <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
-                <select class="visual-slot">
-                    <option value="other">Slot: Other</option>
-                    <option value="mechanics">Slot: Mechanics</option>
-                    <option value="vald">Slot: VALD</option>
-                    <option value="hittrax">Slot: HitTrax</option>
-                </select>
-                <input type="text" class="visual-caption" placeholder="Caption (optional)">
-                <button type="button" class="secondary-btn visual-remove" style="justify-self:start;">Remove</button>
+                <span class="visual-order">#1</span>
+                <div class="visual-row-fields">
+                    <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
+                    <select class="visual-slot">
+                        <option value="other">Slot: Other</option>
+                        <option value="blast">Slot: Blast Motion</option>
+                        <option value="vald">Slot: VALD</option>
+                        <option value="hittrax">Slot: HitTrax</option>
+                    </select>
+                    <input type="text" class="visual-caption" placeholder="Caption (optional)">
+                </div>
+                <div class="visual-row-actions">
+                    <button type="button" class="icon-btn visual-up" title="Move up" aria-label="Move up">↑</button>
+                    <button type="button" class="icon-btn visual-down" title="Move down" aria-label="Move down">↓</button>
+                    <button type="button" class="icon-btn visual-remove" title="Remove" aria-label="Remove">×</button>
+                </div>
             `;
             row.querySelector('.visual-remove').addEventListener('click', () => {
                 row.remove();
-                addVisualBtn.disabled = visualRowsEl.querySelectorAll('.visual-row').length >= MAX_VISUALS;
+                refreshVisualOrderLabels(container);
             });
-            visualRowsEl.appendChild(row);
-            addVisualBtn.disabled = visualRowsEl.querySelectorAll('.visual-row').length >= MAX_VISUALS;
+            row.querySelector('.visual-up').addEventListener('click', () => moveVisualRow(row, -1));
+            row.querySelector('.visual-down').addEventListener('click', () => moveVisualRow(row, 1));
+            container.appendChild(row);
+            refreshVisualOrderLabels(container);
         }
 
-        addVisualBtn.addEventListener('click', addVisualRow);
-        addVisualRow();
+        addVisualBtn.addEventListener('click', () => addVisualRow(visualRowsEl, addVisualBtn));
+        regenAddVisualBtn.addEventListener('click', () => addVisualRow(regenVisualRowsEl, regenAddVisualBtn));
+        initMechanicsRows(mechanicsRowsEl);
+        initMechanicsRows(regenMechanicsRowsEl);
+        addVisualRow(visualRowsEl, addVisualBtn);
+        addVisualRow(regenVisualRowsEl, regenAddVisualBtn);
 
-        function collectVisualUploads() {
+        function collectMechanicsUploads(container) {
             const items = [];
-            visualRowsEl.querySelectorAll('.visual-row').forEach((row) => {
+            container.querySelectorAll('.mechanics-row').forEach((row) => {
+                const fileInput = row.querySelector('.visual-file');
+                const file = fileInput && fileInput.files && fileInput.files[0];
+                if (!file) return;
+                items.push({
+                    file,
+                    caption: (row.querySelector('.visual-caption').value || '').trim(),
+                    slot: row.dataset.slot || 'other',
+                });
+            });
+            return items;
+        }
+
+        function collectVisualUploads(container) {
+            const items = [];
+            container.querySelectorAll('.visual-row:not(.mechanics-row)').forEach((row) => {
                 const fileInput = row.querySelector('.visual-file');
                 const file = fileInput && fileInput.files && fileInput.files[0];
                 if (!file) return;
@@ -550,6 +953,13 @@
             return items;
         }
 
+        function collectAllVisualUploads(mechanicsContainer, extrasContainer) {
+            return [
+                ...collectMechanicsUploads(mechanicsContainer),
+                ...collectVisualUploads(extrasContainer),
+            ];
+        }
+
         async function uploadVisuals(assessmentId, items, { regenerate = true } = {}) {
             if (!items.length) return null;
             const body = new FormData();
@@ -557,6 +967,7 @@
                 body.append('file', item.file, item.file.name);
                 body.append(`caption${i}`, item.caption || '');
                 body.append(`slot${i}`, item.slot || 'other');
+                body.append(`order${i}`, String(i));
             });
             body.append('regenerate', regenerate ? '1' : '0');
             const response = await fetch(`${API_URL}/${assessmentId}/attachments`, {
@@ -566,6 +977,122 @@
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 throw new Error(data.error || `Upload failed (${response.status})`);
+            }
+            return data;
+        }
+
+        const loadAttachmentsBtn = document.getElementById('loadAttachmentsBtn');
+        const existingAttachmentsEl = document.getElementById('existingAttachments');
+        const regenNotesEl = document.getElementById('regenNotes');
+        const regenVideoUrlEl = document.getElementById('regenVideoUrl');
+        const regenUsedBlastEl = document.getElementById('regenUsedBlast');
+        const regenUsedHittraxEl = document.getElementById('regenUsedHittrax');
+        const regenUsedValdEl = document.getElementById('regenUsedVald');
+        const regenByIdPanel = document.getElementById('regenByIdPanel');
+        const regenByPlayerPanel = document.getElementById('regenByPlayerPanel');
+        const regenPlayerNameEl = document.getElementById('regenPlayerName');
+        const regenVisitEl = document.getElementById('regenVisit');
+        const regenLookupStatusEl = document.getElementById('regenLookupStatus');
+        const regenBtn = document.getElementById('regenBtn');
+        const regenIdInput = document.getElementById('regenAssessmentId');
+        const regenMessageEl = document.getElementById('regenMessage');
+        let regenNotesDirty = false;
+        let regenVideoDirty = false;
+        let regenToolsDirty = false;
+        let regenPlayerLookupToken = 0;
+
+        regenNotesEl.addEventListener('input', () => { regenNotesDirty = true; });
+        regenVideoUrlEl.addEventListener('input', () => { regenVideoDirty = true; });
+        [regenUsedBlastEl, regenUsedHittraxEl, regenUsedValdEl].forEach((input) => {
+            input.addEventListener('change', () => { regenToolsDirty = true; });
+        });
+
+        function attachmentSlotLabel(slot) {
+            const phase = MECHANICS_PHASES.find((p) => p.slot === slot);
+            if (phase) return phase.label;
+            return (slot || 'other').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        }
+
+        async function loadExistingAttachments(assessmentId) {
+            const response = await fetch(`${API_URL}/${assessmentId}/attachments`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not load images (${response.status})`);
+            }
+            return data.attachments || [];
+        }
+
+        async function fetchAssessmentDetails(assessmentId) {
+            const response = await fetch(`${API_URL}/${assessmentId}`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not load assessment (${response.status})`);
+            }
+            return data;
+        }
+
+        function applyAssessmentDetails(data) {
+            regenNotesEl.value = data.notes || '';
+            regenVideoUrlEl.value = data.video_analysis_url || '';
+            regenUsedBlastEl.checked = data.used_blast !== 0 && data.used_blast !== false;
+            regenUsedHittraxEl.checked =
+                data.used_hittrax !== 0 && data.used_hittrax !== false;
+            regenUsedValdEl.checked = data.used_vald !== 0 && data.used_vald !== false;
+            regenNotesDirty = false;
+            regenVideoDirty = false;
+            regenToolsDirty = false;
+        }
+
+        async function loadAssessmentDetails(assessmentId) {
+            const data = await fetchAssessmentDetails(assessmentId);
+            applyAssessmentDetails(data);
+            return data;
+        }
+
+        function renderExistingAttachments(assessmentId, items) {
+            existingAttachmentsEl.innerHTML = '';
+            if (!items.length) {
+                existingAttachmentsEl.innerHTML =
+                    '<div class="helper-text">No images attached to this assessment yet.</div>';
+                return;
+            }
+            items.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = 'attachment-row';
+                const caption = (item.caption || '').trim();
+                row.innerHTML = `
+                    <input type="checkbox" class="attachment-select" value="${item.attachment_id}">
+                    <div class="attachment-info">
+                        <span class="attachment-slot">${attachmentSlotLabel(item.slot)}</span>
+                        <span class="attachment-caption${caption ? '' : ' missing'}">
+                            — ${caption || 'no caption'}
+                        </span>
+                    </div>
+                `;
+                existingAttachmentsEl.appendChild(row);
+            });
+
+            const helper = document.createElement('div');
+            helper.className = 'helper-text';
+            helper.textContent =
+                'Selected images will be deleted when Generate PDF is clicked.';
+            existingAttachmentsEl.appendChild(helper);
+        }
+
+        async function deleteSelectedAttachments(assessmentId, regenerate) {
+            const ids = Array.from(
+                existingAttachmentsEl.querySelectorAll('.attachment-select:checked')
+            ).map((box) => box.value);
+            if (!ids.length) return null;
+
+            const response = await fetch(
+                `${API_URL}/${assessmentId}/attachments?ids=${ids.join(',')}` +
+                `&regenerate=${regenerate ? '1' : '0'}`,
+                { method: 'DELETE' }
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Delete failed (${response.status})`);
             }
             return data;
         }
@@ -597,10 +1124,290 @@
         }
 
         function formatAssessmentOption(a) {
-            const type = (a.assessment_type || '').toString();
-            const typeLabel = type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Assessment';
+            const type = (a.assessment_type || '').toString().toLowerCase();
+            let typeLabel = 'Assessment';
+            if (type === 'initial') {
+                typeLabel = 'Initial';
+            } else if (type === 'retest') {
+                const n = Number(a.retest_number);
+                typeLabel = Number.isInteger(n) && n >= 1
+                    ? `${ordinal(n)} Retest`
+                    : 'Retest';
+            } else if (type) {
+                typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+            }
             return `#${a.assessment_id} · ${a.assessment_date} · ${typeLabel}`;
         }
+
+        function ordinal(n) {
+            const v = n % 100;
+            if (v >= 11 && v <= 13) return `${n}th`;
+            return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
+        }
+
+        function nextRetestNumber(assessments) {
+            const priorRetests = assessments.filter(
+                (a) => (a.assessment_type || '').toString().toLowerCase() === 'retest'
+            ).length;
+            return priorRetests + 1;
+        }
+
+        function annotateVisitNumbers(assessments) {
+            const chronological = [...assessments].sort((a, b) => {
+                const byDate = String(a.assessment_date || '').localeCompare(
+                    String(b.assessment_date || '')
+                );
+                if (byDate) return byDate;
+                return Number(a.assessment_id) - Number(b.assessment_id);
+            });
+            let retestIdx = 0;
+            let sawInitial = false;
+            chronological.forEach((a) => {
+                const type = (a.assessment_type || '').toString().toLowerCase();
+                if (type === 'retest') {
+                    retestIdx += 1;
+                    a.retest_number = retestIdx;
+                    a.visit_key = `retest:${retestIdx}`;
+                    a.visit_label = `${ordinal(retestIdx)} Retest`;
+                } else if (type === 'initial') {
+                    if (!sawInitial) {
+                        a.visit_key = 'initial';
+                        a.visit_label = 'Initial';
+                        sawInitial = true;
+                    } else {
+                        a.visit_key = `initial:${a.assessment_id}`;
+                        a.visit_label = `Initial · #${a.assessment_id}`;
+                    }
+                } else {
+                    a.visit_key = `id:${a.assessment_id}`;
+                    a.visit_label = formatAssessmentOption(a);
+                }
+            });
+            return chronological;
+        }
+
+        function getRegenLookupMode() {
+            const checked = document.querySelector('input[name="regenLookupMode"]:checked');
+            return checked ? checked.value : 'id';
+        }
+
+        function setRegenLookupMode(mode) {
+            document.querySelectorAll('input[name="regenLookupMode"]').forEach((input) => {
+                input.checked = input.value === mode;
+            });
+            const byId = mode === 'id';
+            regenByIdPanel.hidden = !byId;
+            regenByPlayerPanel.hidden = byId;
+        }
+
+        function resetRegenVisitSelect(message) {
+            regenVisitEl.innerHTML = '';
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = message || 'Look up a player first';
+            regenVisitEl.appendChild(opt);
+            regenVisitEl.disabled = true;
+        }
+
+        function populateRegenVisits(assessments) {
+            const visits = annotateVisitNumbers(assessments);
+            regenVisitEl.innerHTML = '';
+            if (!visits.length) {
+                resetRegenVisitSelect('No assessments found');
+                return [];
+            }
+            visits.forEach((a) => {
+                const opt = document.createElement('option');
+                opt.value = a.visit_key;
+                opt.textContent = `${a.visit_label} · #${a.assessment_id} · ${a.assessment_date}`;
+                opt.dataset.assessmentId = String(a.assessment_id);
+                regenVisitEl.appendChild(opt);
+            });
+            regenVisitEl.disabled = false;
+            return visits;
+        }
+
+        async function lookupRegenPlayerVisits(rawName) {
+            const name = titleCaseName(rawName.trim());
+            regenPlayerNameEl.value = name;
+            if (name.length < 2) {
+                resetRegenVisitSelect('Enter a player name');
+                regenLookupStatusEl.textContent = '';
+                return [];
+            }
+
+            const token = ++regenPlayerLookupToken;
+            regenLookupStatusEl.textContent = 'Looking up assessments…';
+            resetRegenVisitSelect('Looking up…');
+
+            const response = await fetch(`${API_URL}/player/${encodeURIComponent(name)}`);
+            const data = await response.json().catch(() => ({}));
+            if (token !== regenPlayerLookupToken) return [];
+            if (!response.ok) {
+                resetRegenVisitSelect('Lookup failed');
+                throw new Error(data.error || `Could not look up ${name}`);
+            }
+
+            const assessments = data.assessments || [];
+            if (!assessments.length) {
+                resetRegenVisitSelect('No assessments found');
+                regenLookupStatusEl.textContent =
+                    `No assessments found for ${name}. Create a new assessment submission above.`;
+                return [];
+            }
+
+            populateRegenVisits(assessments);
+            regenLookupStatusEl.textContent =
+                `${assessments.length} assessment${assessments.length === 1 ? '' : 's'} found for ${data.player_name || name}`;
+            return assessments;
+        }
+
+        async function resolveRegenAssessmentId() {
+            if (getRegenLookupMode() === 'id') {
+                const id = regenIdInput.value.trim();
+                if (!Number.isInteger(Number(id)) || Number(id) < 1) {
+                    throw new Error('Enter a valid assessment ID');
+                }
+                return String(id);
+            }
+
+            const name = titleCaseName(regenPlayerNameEl.value.trim());
+            regenPlayerNameEl.value = name;
+            if (name.length < 2) {
+                throw new Error('Enter a player name');
+            }
+
+            let visitKey = regenVisitEl.value;
+            if (!visitKey || regenVisitEl.disabled) {
+                const assessments = await lookupRegenPlayerVisits(name);
+                if (!assessments.length) {
+                    throw new Error(
+                        `No assessments found for ${name}. Create a new assessment submission above.`
+                    );
+                }
+                visitKey = regenVisitEl.value;
+            }
+
+            const selected = regenVisitEl.selectedOptions[0];
+            const id = selected && selected.dataset.assessmentId;
+            if (!id) {
+                throw new Error(
+                    `That assessment was not found for ${name}. Create a new assessment submission above.`
+                );
+            }
+            regenIdInput.value = id;
+            return String(id);
+        }
+
+        // Auto-load keeps notes/tools/images in sync with the selected assessment.
+        let regenLoadedId = null;
+        let regenAutoLoadToken = 0;
+
+        async function loadRegenAssessment(assessmentId, { force = false } = {}) {
+            const id = String(assessmentId || '').trim();
+            if (!id) return;
+            if (!force && regenLoadedId === id) return;
+
+            const token = ++regenAutoLoadToken;
+            regenLoadedId = id;
+            existingAttachmentsEl.innerHTML =
+                '<div class="helper-text">Loading attached images…</div>';
+            try {
+                const [details, attachments] = await Promise.all([
+                    fetchAssessmentDetails(id),
+                    loadExistingAttachments(id),
+                ]);
+                if (token !== regenAutoLoadToken) return;
+                applyAssessmentDetails(details);
+                renderExistingAttachments(id, attachments);
+            } catch (err) {
+                if (token !== regenAutoLoadToken) return;
+                regenLoadedId = null;
+                existingAttachmentsEl.innerHTML = '';
+                throw err;
+            }
+        }
+
+        function autoLoadRegenAssessment(assessmentId, options) {
+            loadRegenAssessment(assessmentId, options).catch((err) => {
+                showRegenMessage(`Error: ${err.message}`, 'error');
+            });
+        }
+
+        document.querySelectorAll('input[name="regenLookupMode"]').forEach((input) => {
+            input.addEventListener('change', () => {
+                setRegenLookupMode(input.value);
+                regenMessageEl.classList.remove('show');
+                if (input.value === 'id') {
+                    const id = regenIdInput.value.trim();
+                    if (Number.isInteger(Number(id)) && Number(id) >= 1) {
+                        autoLoadRegenAssessment(id);
+                    }
+                } else {
+                    const selected = regenVisitEl.selectedOptions[0];
+                    if (selected && selected.dataset.assessmentId) {
+                        autoLoadRegenAssessment(selected.dataset.assessmentId);
+                    }
+                }
+            });
+        });
+
+        let regenIdTimer = null;
+        regenIdInput.addEventListener('input', () => {
+            clearTimeout(regenIdTimer);
+            const id = regenIdInput.value.trim();
+            if (!Number.isInteger(Number(id)) || Number(id) < 1) return;
+            regenIdTimer = setTimeout(() => autoLoadRegenAssessment(id), 400);
+        });
+
+        regenVisitEl.addEventListener('change', () => {
+            const selected = regenVisitEl.selectedOptions[0];
+            const id = selected && selected.dataset.assessmentId;
+            if (id) {
+                regenIdInput.value = id;
+                autoLoadRegenAssessment(id);
+            }
+        });
+
+        let regenPlayerTimer = null;
+        async function runRegenPlayerLookup() {
+            const assessments = await lookupRegenPlayerVisits(regenPlayerNameEl.value);
+            if (!assessments.length) return;
+            const selected = regenVisitEl.selectedOptions[0];
+            const id = selected && selected.dataset.assessmentId;
+            if (id) {
+                regenIdInput.value = id;
+                await loadRegenAssessment(id);
+            }
+        }
+
+        regenPlayerNameEl.addEventListener('input', () => {
+            clearTimeout(regenPlayerTimer);
+            regenPlayerTimer = setTimeout(() => {
+                runRegenPlayerLookup().catch((err) => {
+                    regenLookupStatusEl.textContent = err.message;
+                });
+            }, 400);
+        });
+        regenPlayerNameEl.addEventListener('change', () => {
+            clearTimeout(regenPlayerTimer);
+            runRegenPlayerLookup().catch((err) => {
+                regenLookupStatusEl.textContent = err.message;
+            });
+        });
+
+        loadAttachmentsBtn.addEventListener('click', async () => {
+            loadAttachmentsBtn.disabled = true;
+            try {
+                const id = await resolveRegenAssessmentId();
+                await loadRegenAssessment(id, { force: true });
+                showRegenMessage(`✓ Reloaded assessment #${id}.`, 'success');
+            } catch (err) {
+                showRegenMessage(`Error: ${err.message}`, 'error');
+            } finally {
+                loadAttachmentsBtn.disabled = false;
+            }
+        });
 
         function resetTypePanel() {
             assessmentType = null;
@@ -625,12 +1432,22 @@
         function showRetest(assessments) {
             assessmentType = 'retest';
             typePanel.classList.add('show');
-            typeBadge.textContent = 'Retest';
+            const n = nextRetestNumber(assessments);
+            typeBadge.textContent = `${ordinal(n)} Retest`;
             typeBadge.className = 'type-badge retest';
             typeCopy.textContent = `Found ${assessments.length} prior assessment${assessments.length === 1 ? '' : 's'}. Confirm which previous date to compare against.`;
             previousGroup.style.display = 'block';
             previousSelect.required = true;
             previousSelect.innerHTML = '';
+            // API returns newest first; assign retest ordinals oldest→newest for labels.
+            const chronological = [...assessments].reverse();
+            let retestIdx = 0;
+            chronological.forEach((a) => {
+                if ((a.assessment_type || '').toString().toLowerCase() === 'retest') {
+                    retestIdx += 1;
+                    a.retest_number = retestIdx;
+                }
+            });
             assessments.forEach((a, i) => {
                 const opt = document.createElement('option');
                 opt.value = a.assessment_id;
@@ -767,7 +1584,10 @@
             regenMessageEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
-        async function regenerateReport(assessmentId, { button, onSuccessMessage } = {}) {
+        async function regenerateReport(
+            assessmentId,
+            { button, onSuccessMessage, updates = {} } = {}
+        ) {
             const id = Number(assessmentId);
             if (!Number.isInteger(id) || id < 1) {
                 throw new Error('Enter a valid assessment ID');
@@ -779,7 +1599,11 @@
             btn.innerHTML = '<span class="spinner"></span>Generating…';
 
             try {
-                const response = await fetch(`${API_URL}/${id}/report`, { method: 'POST' });
+                const response = await fetch(`${API_URL}/${id}/report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates),
+                });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok) {
                     throw new Error(data.error || `Report failed (${response.status})`);
@@ -796,36 +1620,71 @@
             }
         }
 
-        const regenBtn = document.getElementById('regenBtn');
-        const regenIdInput = document.getElementById('regenAssessmentId');
-        const regenMessageEl = document.getElementById('regenMessage');
+        setRegenLookupMode('id');
+        resetRegenVisitSelect('Look up a player first');
 
         regenBtn.addEventListener('click', async () => {
             regenMessageEl.classList.remove('show');
+            const previousLabel = regenBtn.textContent;
+            regenBtn.disabled = true;
+            regenBtn.innerHTML = '<span class="spinner"></span>Generating…';
             try {
-                const id = regenIdInput.value.trim();
-                const files = Array.from(document.getElementById('regenVisualFile').files || []);
-                const caption = (document.getElementById('regenVisualCaption').value || '').trim();
-                if (files.length) {
-                    const items = files.slice(0, MAX_VISUALS).map((file) => ({
-                        file,
-                        caption,
-                        slot: 'other',
-                    }));
-                    const uploadData = await uploadVisuals(id, items, { regenerate: true });
-                    showRegenMessage(
-                        `✓ Uploaded ${uploadData.uploaded?.length || 0} image(s) and refreshed PDF.` +
-                        reportLinkHtml(uploadData.report_uri || uploadData.report_gcs_uri),
-                        'success'
-                    );
-                    document.getElementById('regenVisualFile').value = '';
-                    return;
+                const id = await resolveRegenAssessmentId();
+                const visuals = collectAllVisualUploads(regenMechanicsRowsEl, regenVisualRowsEl);
+                const hadLoadedAttachments =
+                    Boolean(existingAttachmentsEl.querySelector('.attachment-row'));
+                const updates = {};
+                if (regenNotesDirty) {
+                    updates.notes = regenNotesEl.value.trim();
                 }
-                const html = await regenerateReport(id, { button: regenBtn });
+                if (regenVideoDirty) {
+                    updates.videoAnalysisUrl = regenVideoUrlEl.value.trim();
+                }
+                if (regenToolsDirty) {
+                    updates.usedBlast = regenUsedBlastEl.checked;
+                    updates.usedHittrax = regenUsedHittraxEl.checked;
+                    updates.usedVald = regenUsedValdEl.checked;
+                }
+
+                const deleteData = await deleteSelectedAttachments(id, false);
+                const deletedCount = deleteData?.deleted?.length || 0;
+                let uploadedCount = 0;
+
+                if (visuals.length) {
+                    const uploadData = await uploadVisuals(id, visuals, { regenerate: false });
+                    uploadedCount = uploadData.uploaded?.length || 0;
+                    initMechanicsRows(regenMechanicsRowsEl);
+                    regenVisualRowsEl.innerHTML = '';
+                    addVisualRow(regenVisualRowsEl, regenAddVisualBtn);
+                }
+
+                const changes = [];
+                if (deletedCount) changes.push(`removed ${deletedCount} image(s)`);
+                if (uploadedCount) changes.push(`uploaded ${uploadedCount} image(s)`);
+                if (regenNotesDirty) changes.push('updated notes');
+                if (regenVideoDirty) changes.push('updated video link');
+                if (regenToolsDirty) changes.push('updated tools');
+                const html = await regenerateReport(id, {
+                    button: regenBtn,
+                    updates,
+                    onSuccessMessage: (data) =>
+                        `✓ ${changes.length ? `${changes.join(', ')} and ` : ''}` +
+                        `generated PDF for assessment #${data.assessment_id}.`,
+                });
                 showRegenMessage(html, 'success');
+                regenNotesDirty = false;
+                regenVideoDirty = false;
+                regenToolsDirty = false;
+
+                if (hadLoadedAttachments) {
+                    renderExistingAttachments(id, await loadExistingAttachments(id));
+                }
             } catch (err) {
                 console.error('Regenerate failed:', err);
                 showRegenMessage(`Error: ${err.message}`, 'error');
+            } finally {
+                regenBtn.disabled = false;
+                regenBtn.textContent = previousLabel;
             }
         });
 
@@ -886,6 +1745,10 @@
                 assessmentType,
                 trainerName: document.getElementById('trainerName').value.trim(),
                 notes: document.getElementById('notes').value.trim(),
+                videoAnalysisUrl: document.getElementById('videoAnalysisUrl').value.trim(),
+                usedBlast: document.getElementById('usedBlast').checked,
+                usedHittrax: document.getElementById('usedHittrax').checked,
+                usedVald: document.getElementById('usedVald').checked,
             };
             if (assessmentType === 'retest') {
                 formData.previousAssessmentId = Number(previousSelect.value);
@@ -901,16 +1764,30 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    const typeLabel = (data.assessment_type || assessmentType || '').toString();
-                    const prettyType = typeLabel
-                        ? typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)
-                        : '';
+                    const typeLabel = (data.assessment_type || assessmentType || '').toString().toLowerCase();
+                    let prettyType = '';
+                    if (typeLabel === 'retest') {
+                        prettyType = typeBadge.textContent || 'Retest';
+                    } else if (typeLabel) {
+                        prettyType = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+                    }
                     lastSubmittedId = data.assessment_id;
+                    setRegenLookupMode('id');
                     regenIdInput.value = data.assessment_id;
+                    regenNotesEl.value = formData.notes;
+                    regenVideoUrlEl.value = formData.videoAnalysisUrl || '';
+                    regenUsedBlastEl.checked = formData.usedBlast;
+                    regenUsedHittraxEl.checked = formData.usedHittrax;
+                    regenUsedValdEl.checked = formData.usedVald;
+                    regenNotesDirty = false;
+                    regenVideoDirty = false;
+                    regenToolsDirty = false;
+                    regenLoadedId = String(data.assessment_id);
+                    existingAttachmentsEl.innerHTML = '';
 
                     let reportUri = data.report_uri || data.report_gcs_uri;
                     let visualNote = '';
-                    const visuals = collectVisualUploads();
+                    const visuals = collectAllVisualUploads(mechanicsRowsEl, visualRowsEl);
                     if (visuals.length) {
                         try {
                             const uploadData = await uploadVisuals(data.assessment_id, visuals, {
@@ -922,6 +1799,7 @@
                             console.error(uploadErr);
                             visualNote = ` · visuals upload failed: ${uploadErr.message}`;
                         }
+                        autoLoadRegenAssessment(data.assessment_id, { force: true });
                     }
 
                     showMessage(
@@ -936,9 +1814,10 @@
                         'success'
                     );
                     form.reset();
+                    initMechanicsRows(mechanicsRowsEl);
                     visualRowsEl.innerHTML = '';
                     addVisualBtn.disabled = false;
-                    addVisualRow();
+                    addVisualRow(visualRowsEl, addVisualBtn);
                     assessmentDateInput.value = today;
                     resetTypePanel();
                     setTimeout(loadRecentNames, 1000);

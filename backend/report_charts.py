@@ -39,31 +39,237 @@ def _ensure_mpl():
     matplotlib.use("Agg")
 
 
-# ---------------------------------------------------------------------------
-# HitTrax — existing light charts
-# ---------------------------------------------------------------------------
+# Ball-flight bins (launch angle °) — simple point model for insight
+FLIGHT_BINS: list[tuple[str, float, float, str]] = [
+    ("GB", float("-inf"), 10.0, "#6b7280"),
+    ("LD", 10.0, 25.0, "#2563eb"),
+    ("FB", 25.0, 50.0, "#16a34a"),
+    ("PU", 50.0, float("inf"), "#f59e0b"),
+]
+MIN_FIT_N = 8
+PEAK_LA_HALF_WIDTH = 5.0  # shade ±5° around peak predicted distance LA
+
+
+def _ols_linear(xs: list[float], ys: list[float]) -> Optional[tuple[float, float]]:
+    """Return (intercept, slope) for y = a + b x, or None."""
+    n = len(xs)
+    if n < 2:
+        return None
+    mean_x = statistics.mean(xs)
+    mean_y = statistics.mean(ys)
+    var_x = sum((x - mean_x) ** 2 for x in xs)
+    if var_x < 1e-12:
+        return None
+    cov = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+    b = cov / var_x
+    a = mean_y - b * mean_x
+    return a, b
+
+
+def _ols_quadratic(xs: list[float], ys: list[float]) -> Optional[tuple[float, float, float]]:
+    """
+    Dist ~ a + b·LA + c·LA² via normal equations (3×3).
+    Vertex LA = -b/(2c) when c < 0 → useful peak-distance launch angle.
+    """
+    n = len(xs)
+    if n < 4:
+        return None
+    # Design matrix columns: 1, x, x²
+    s0 = float(n)
+    s1 = sum(xs)
+    s2 = sum(x * x for x in xs)
+    s3 = sum(x ** 3 for x in xs)
+    s4 = sum(x ** 4 for x in xs)
+    t0 = sum(ys)
+    t1 = sum(x * y for x, y in zip(xs, ys))
+    t2 = sum(x * x * y for x, y in zip(xs, ys))
+    # Solve [[s0,s1,s2],[s1,s2,s3],[s2,s3,s4]] [a,b,c]^T = [t0,t1,t2]
+    A = [[s0, s1, s2], [s1, s2, s3], [s2, s3, s4]]
+    bvec = [t0, t1, t2]
+    try:
+        # Gaussian elimination
+        M = [A[i][:] + [bvec[i]] for i in range(3)]
+        for col in range(3):
+            piv = max(range(col, 3), key=lambda r: abs(M[r][col]))
+            if abs(M[piv][col]) < 1e-12:
+                return None
+            M[col], M[piv] = M[piv], M[col]
+            div = M[col][col]
+            for j in range(col, 4):
+                M[col][j] /= div
+            for r in range(3):
+                if r == col:
+                    continue
+                factor = M[r][col]
+                for j in range(col, 4):
+                    M[r][j] -= factor * M[col][j]
+        a, b, c = M[0][3], M[1][3], M[2][3]
+        return a, b, c
+    except Exception:
+        return None
 
 
 def _ev_la_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
-    pts = [
-        (c["launch_angle"], c["ev"])
-        for c in contacts
-        if c.get("launch_angle") is not None and c.get("ev") is not None
-    ]
-    if not pts:
+    """
+    EV × LA with:
+      (A) Optimal LA from hang-time proxy EV̂(θ)·sin(θ) using the EV~LA fit
+          (trainer-aligned; peaks near ~80° when EV declines gently with LA)
+      (B) Points colored by ball-flight bin (GB / LD / FB / PU)
+      (C) EV~LA linear trend on the primary axis
+
+    Legend + fit notes sit outside the axes so they don't cover points.
+    """
+    rows: list[tuple[float, float, Optional[float]]] = []
+    for c in contacts:
+        la = c.get("launch_angle")
+        ev = c.get("ev")
+        if la is None or ev is None:
+            continue
+        dist = c.get("distance")
+        try:
+            rows.append(
+                (
+                    float(la),
+                    float(ev),
+                    float(dist) if dist is not None else None,
+                )
+            )
+        except (TypeError, ValueError):
+            continue
+    if not rows:
         return None
 
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
 
-    xs, ys = zip(*pts)
-    fig, ax = plt.subplots(figsize=(4.2, 3.2))
-    ax.scatter(xs, ys, c=GOLD, edgecolors=NAVY, s=36, alpha=0.85, linewidths=0.6)
-    ax.axvspan(5, 15, color=NAVY, alpha=0.08, label="LA 5–15°")
+    las = [r[0] for r in rows]
+    evs = [r[1] for r in rows]
+    fig, ax = plt.subplots(figsize=(4.6, 4.2))
+
+    # --- (B) flight-type scatter ---
+    for name, lo, hi, color in FLIGHT_BINS:
+        xs = [la for la, ev, _ in rows if lo <= la < hi]
+        ys = [ev for la, ev, _ in rows if lo <= la < hi]
+        if xs:
+            ax.scatter(
+                xs,
+                ys,
+                c=color,
+                edgecolors=NAVY,
+                s=34,
+                alpha=0.88,
+                linewidths=0.5,
+                zorder=3,
+                label=name,
+            )
+
+    note_bits: list[str] = []
+    peak_la: Optional[float] = None
+
+    if len(rows) >= MIN_FIT_N:
+        # Linear EV ~ LA trend on primary axis
+        lin = _ols_linear(las, evs)
+        if lin is not None:
+            a_e, b_e = lin
+            la_min, la_max = min(las), max(las)
+            # Trend line across observed LA span
+            ax.plot(
+                [la_min, la_max],
+                [a_e + b_e * la_min, a_e + b_e * la_max],
+                color=NAVY,
+                lw=1.4,
+                alpha=0.75,
+                zorder=2,
+                label="EV fit",
+            )
+            note_bits.append(f"EV≈{a_e:.0f}{b_e:+.2f}·LA")
+
+            # Hang-time / lift proxy: EV̂(θ)·sin(θ). With a gently declining EV
+            # fit this peaks near ~80°, matching trainer intuition better than
+            # peak predicted carry (~30–40°).
+            grid = [i * 0.5 for i in range(0, 181)]  # 0° … 90°
+            hang = []
+            for x in grid:
+                ev_hat = a_e + b_e * x
+                hang.append(max(0.0, ev_hat) * math.sin(math.radians(x)) if ev_hat > 0 else 0.0)
+            ax2 = ax.twinx()
+            ax2.plot(grid, hang, color="#0ea5e9", lw=1.6, alpha=0.85, zorder=2)
+            ax2.set_ylabel("Hang-time proxy (EV·sin LA)", fontsize=8, color="#0284c7")
+            ax2.tick_params(axis="y", labelsize=7, colors="#0284c7")
+            ax2.spines["right"].set_color("#7dd3fc")
+            ax2.set_ylim(bottom=0)
+
+            if any(v > 0 for v in hang):
+                peak_la = grid[max(range(len(hang)), key=lambda i: hang[i])]
+                lo_b = peak_la - PEAK_LA_HALF_WIDTH
+                hi_b = peak_la + PEAK_LA_HALF_WIDTH
+                ax.axvspan(lo_b, hi_b, color=NAVY, alpha=0.16, zorder=0, linewidth=0)
+                ax.axvline(peak_la, color=NAVY, lw=1.0, ls="--", alpha=0.7, zorder=1)
+                ax.text(
+                    peak_la,
+                    max(evs),
+                    f" optimal LA\n {peak_la:.0f}°",
+                    ha="center",
+                    va="top",
+                    fontsize=7,
+                    color=NAVY,
+                    alpha=0.9,
+                    zorder=4,
+                )
+                note_bits.append(f"Optimal LA ≈ {peak_la:.0f}°")
+    else:
+        # Sparse day: soft reference band only
+        ax.axvspan(5, 15, color=NAVY, alpha=0.12, zorder=0, linewidth=0)
+        note_bits.append("n low — no fit")
+
     ax.set_xlabel("Launch angle (°)")
     ax.set_ylabel("Exit velocity (mph)")
-    ax.set_title("Exit velocity × launch angle")
-    ax.grid(True, linestyle=":", alpha=0.45)
-    ax.legend(loc="best", fontsize=8, frameon=False)
+    ax.set_title("Exit velocity × launch angle", pad=10)
+    ax.grid(True, linestyle=":", alpha=0.4)
+    # Allow the hang-time curve / optimal marker to extend past observed LAs
+    x_right = max(las)
+    if peak_la is not None:
+        x_right = max(x_right, peak_la + 8, 90)
+    ax.set_xlim(min(min(las), -5), x_right)
+
+    # Legend + equation outside the axes (above / below) so points stay readable
+    flight_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor=col,
+            markeredgecolor=NAVY,
+            markersize=7,
+            label=name,
+        )
+        for name, _, _, col in FLIGHT_BINS
+    ]
+    fig.legend(
+        handles=flight_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.98),
+        ncol=4,
+        fontsize=7,
+        frameon=False,
+        title="Flight",
+        title_fontsize=8,
+        borderaxespad=0,
+    )
+    if note_bits:
+        fig.text(
+            0.5,
+            0.02,
+            " · ".join(note_bits),
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            color=NAVY,
+            alpha=0.95,
+        )
+    fig.subplots_adjust(top=0.82, bottom=0.16, left=0.12, right=0.88)
+
     data = _png_bytes(fig)
     _close(fig)
     return data
@@ -91,27 +297,63 @@ def _spray_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
     ys = [p[1] for p in pts]
     evs = [p[2] for p in pts]
 
-    fig, ax = plt.subplots(figsize=(4.2, 3.6))
-    max_r = max(max(abs(x) for x in xs), max(ys), 50) * 1.1
+    # Larger, wider canvas — less vertically stretched than a near-square figure
+    fig, ax = plt.subplots(figsize=(6.6, 4.8))
+    max_r = max(max(abs(x) for x in xs), max(ys), 50) * 1.15
     for ang in (-45, 45):
         r = math.radians(ang)
-        ax.plot([0, max_r * math.sin(r)], [0, max_r * math.cos(r)], color=MUTED, lw=0.8, alpha=0.7)
-    theta = np.linspace(math.radians(-45), math.radians(45), 60)
-    for radius in (200, 300, 400):
+        ax.plot(
+            [0, max_r * math.sin(r)],
+            [0, max_r * math.cos(r)],
+            color=MUTED,
+            lw=1.2,
+            alpha=0.75,
+        )
+    theta = np.linspace(math.radians(-45), math.radians(45), 80)
+    for radius in (150, 200, 250, 300, 350, 400):
         if radius > max_r:
             continue
-        ax.plot(radius * np.sin(theta), radius * np.cos(theta), color=MUTED, lw=0.5, alpha=0.35)
+        ax.plot(
+            radius * np.sin(theta),
+            radius * np.cos(theta),
+            color=MUTED,
+            lw=0.6,
+            alpha=0.4,
+        )
 
-    sc = ax.scatter(xs, ys, c=evs, cmap="YlOrRd", edgecolors=NAVY, s=40, linewidths=0.5, alpha=0.9)
-    cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+    # Home plate marker at origin
+    from matplotlib.patches import Polygon
+
+    plate_ft = 0.7
+    ax.add_patch(
+        Polygon(
+            [
+                (-plate_ft, 0),
+                (-plate_ft, plate_ft * 0.6),
+                (0, plate_ft * 1.2),
+                (plate_ft, plate_ft * 0.6),
+                (plate_ft, 0),
+            ],
+            closed=True,
+            facecolor=NAVY,
+            edgecolor=NAVY,
+            alpha=0.35,
+            zorder=1,
+        )
+    )
+
+    sc = ax.scatter(xs, ys, c=evs, cmap="YlOrRd", edgecolors=NAVY, s=48, linewidths=0.5, alpha=0.9, zorder=3)
+    cbar = fig.colorbar(sc, ax=ax, fraction=0.04, pad=0.02)
     cbar.set_label("EV (mph)", fontsize=8)
     ax.set_aspect("equal", adjustable="box")
     ax.set_xlim(-max_r, max_r)
-    ax.set_ylim(-10, max_r)
-    ax.set_xlabel("Pull ← → Oppo (ft)")
-    ax.set_ylabel("Toward CF (ft)")
-    ax.set_title("Spray chart")
-    ax.grid(True, linestyle=":", alpha=0.35)
+    ax.set_ylim(-max_r * 0.05, max_r)
+    ax.set_title("Spray chart", fontsize=12)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.grid(True, linestyle=":", alpha=0.3)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
     data = _png_bytes(fig)
     _close(fig)
     return data
@@ -122,41 +364,54 @@ def _spray_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
 # ---------------------------------------------------------------------------
 
 
-def _plate_xy(c: dict[str, Any]) -> Optional[tuple[float, float]]:
-    """Normalized plate coords in ~[0,1]×[0,1] (catcher's view: x left→right, y low→high)."""
-    x = c.get("intersect2")
-    y = c.get("intersect3")
-    if x is not None and y is not None:
-        return float(x), float(y)
-    # Fallback: scale PBH/PBV into 0–1 from observed HitTrax ranges
+def _pitch_xy(c: dict[str, Any]) -> Optional[tuple[float, float]]:
+    """
+    Pitch location in unit square [0,1]×[0,1] (catcher's view: x left→right, y low→high).
+
+    Prefer HitTrax PBH/PBV — those are the plate-crossing coordinates the 13-zone
+    charts are built from. Intersect2/3 are point-of-contact spatial coords and
+    are not on the same scale (using them left most dots in empty corners).
+    """
     pbh, pbv = c.get("pbh"), c.get("pbv")
-    if pbh is None or pbv is None:
+    if pbh is not None and pbv is not None:
+        # Calibrated from observed HitTrax ranges (~PBH 1.5–7.5, PBV 7.5–20)
+        nx = (float(pbh) - 1.0) / 7.0
+        ny = (float(pbv) - 7.0) / 14.0
+        return max(0.0, min(1.0, nx)), max(0.0, min(1.0, ny))
+    # Rare fallback: only if Intersect already looks unit-normalized
+    x, y = c.get("intersect2"), c.get("intersect3")
+    if x is None or y is None:
         return None
-    # Peele sample ~ PBH 1.5–7.5, PBV 7.5–20
-    nx = (float(pbh) - 1.0) / 7.0
-    ny = (float(pbv) - 7.0) / 14.0
-    return max(0.0, min(1.0, nx)), max(0.0, min(1.0, ny))
+    fx, fy = float(x), float(y)
+    if 0.0 <= fx <= 1.0 and 0.0 <= fy <= 1.0:
+        return fx, fy
+    return None
+
+
+def _plate_xy(c: dict[str, Any]) -> Optional[tuple[float, float]]:
+    """Alias for catcher's-view plate location (pitch path through the zone)."""
+    return _pitch_xy(c)
 
 
 def _assign_zone(x: float, y: float) -> str:
     """
     13-zone HitTrax-style layout on unit square.
-    Core 3×3 for x,y in [0.25, 0.75]; four outer chase cells.
+    Core 3×3 for x,y in [0.25, 0.75]; four L-shaped outer chase corners.
     """
     lo, hi = 0.25, 0.75
-    if x < lo:
-        return "outer_left"
-    if x > hi:
-        return "outer_right"
-    if y > hi:
-        return "outer_high"
-    if y < lo:
-        return "outer_low"
-    # Inner 3×3
-    col = 0 if x < lo + (hi - lo) / 3 else (1 if x < lo + 2 * (hi - lo) / 3 else 2)
-    row = 0 if y > hi - (hi - lo) / 3 else (1 if y > lo + (hi - lo) / 3 else 2)
-    # row 0 = high, 2 = low
-    return f"z{row}{col}"
+    if lo <= x <= hi and lo <= y <= hi:
+        col = 0 if x < lo + (hi - lo) / 3 else (1 if x < lo + 2 * (hi - lo) / 3 else 2)
+        row = 0 if y > hi - (hi - lo) / 3 else (1 if y > lo + (hi - lo) / 3 else 2)
+        # row 0 = high, 2 = low
+        return f"z{row}{col}"
+    # Outside the core: quadrant L-zones (covers corners + adjacent edge strips)
+    if x < 0.5 and y >= 0.5:
+        return "outer_tl"
+    if x >= 0.5 and y >= 0.5:
+        return "outer_tr"
+    if x < 0.5 and y < 0.5:
+        return "outer_bl"
+    return "outer_br"
 
 
 # Drawing order / geometry for dark zone chart (unit square coords)
@@ -175,21 +430,63 @@ def _core_rects() -> list[tuple[str, float, float, float, float]]:
     return out
 
 
-def _all_zone_rects() -> list[tuple[str, float, float, float, float]]:
+def _outer_zone_polys() -> list[tuple[str, list[tuple[float, float]]]]:
+    """L-shaped outer chase zones that fill the frame around the 3×3 core."""
     return [
-        ("outer_left", 0.0, 0.25, 0.25, 0.50),
-        ("outer_right", 0.75, 0.25, 0.25, 0.50),
-        ("outer_high", 0.25, 0.75, 0.50, 0.25),
-        ("outer_low", 0.25, 0.0, 0.50, 0.25),
-        *_core_rects(),
+        (
+            "outer_tl",
+            [(0.0, 0.5), (0.0, 1.0), (0.5, 1.0), (0.5, 0.75), (0.25, 0.75), (0.25, 0.5)],
+        ),
+        (
+            "outer_tr",
+            [(0.5, 1.0), (1.0, 1.0), (1.0, 0.5), (0.75, 0.5), (0.75, 0.75), (0.5, 0.75)],
+        ),
+        (
+            "outer_bl",
+            [(0.0, 0.0), (0.0, 0.5), (0.25, 0.5), (0.25, 0.25), (0.5, 0.25), (0.5, 0.0)],
+        ),
+        (
+            "outer_br",
+            [(0.5, 0.0), (0.5, 0.25), (0.75, 0.25), (0.75, 0.5), (1.0, 0.5), (1.0, 0.0)],
+        ),
     ]
 
 
+def _all_zone_ids() -> list[str]:
+    return [z for z, _ in _outer_zone_polys()] + [z for z, *_ in _core_rects()]
+
+
+def _draw_home_plate_unit(ax, *, zorder: int = 4) -> None:
+    """Home plate in unit-square plate coords (catcher's view, tip toward catcher / bottom)."""
+    from matplotlib.patches import Polygon
+
+    # Centered under the strike zone core
+    cx, top, tip = 0.5, 0.22, 0.02
+    half = 0.08
+    ax.add_patch(
+        Polygon(
+            [
+                (cx - half, top),
+                (cx - half, top - 0.06),
+                (cx, tip),
+                (cx + half, top - 0.06),
+                (cx + half, top),
+            ],
+            closed=True,
+            facecolor="white",
+            edgecolor="white",
+            alpha=0.45,
+            linewidth=1.0,
+            zorder=zorder,
+        )
+    )
+
+
 def _zone_heatmap(contacts: list[dict[str, Any]], metric: str, title: str, unit: str) -> Optional[bytes]:
-    buckets: dict[str, list[float]] = {z: [] for z, *_ in _all_zone_rects()}
+    buckets: dict[str, list[float]] = {z: [] for z in _all_zone_ids()}
     scatter: list[tuple[float, float, float]] = []
     for c in contacts:
-        xy = _plate_xy(c)
+        xy = _pitch_xy(c)
         val = c.get(metric)
         if xy is None or val is None:
             continue
@@ -202,7 +499,7 @@ def _zone_heatmap(contacts: list[dict[str, Any]], metric: str, title: str, unit:
 
     import matplotlib.pyplot as plt
     import matplotlib.colors as mcolors
-    from matplotlib.patches import Rectangle
+    from matplotlib.patches import Polygon, Rectangle
 
     avgs = {k: (sum(v) / len(v) if v else None) for k, v in buckets.items()}
     present = [a for a in avgs.values() if a is not None]
@@ -214,37 +511,79 @@ def _zone_heatmap(contacts: list[dict[str, Any]], metric: str, title: str, unit:
     cmap = plt.get_cmap("coolwarm")
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
 
-    fig, ax = plt.subplots(figsize=(4.0, 4.0), facecolor=DARK_BG)
+    fig, ax = plt.subplots(figsize=(4.2, 4.4), facecolor=DARK_BG)
     ax.set_facecolor(DARK_BG)
     total_n = len(scatter)
 
-    for zid, x0, y0, w, h in _all_zone_rects():
+    def _zone_color(zid: str) -> str:
         avg = avgs.get(zid)
-        n = len(buckets.get(zid) or [])
         if avg is None:
-            color = "#4a4a4a"
-        else:
-            color = cmap(norm(avg))
-        ax.add_patch(
-            Rectangle((x0, y0), w, h, facecolor=color, edgecolor="white", linewidth=0.8, alpha=0.9)
-        )
-        if avg is not None:
-            label = f"{avg:.0f} {unit}\n{n}/{total_n}"
-            ax.text(
-                x0 + w / 2,
-                y0 + h / 2,
-                label,
-                ha="center",
-                va="center",
-                color="white",
-                fontsize=7,
-                fontweight="bold",
-            )
+            return "#4a4a4a"
+        return cmap(norm(avg))
 
-    # Contact overlay
+    def _zone_label(zid: str, cx: float, cy: float) -> None:
+        avg = avgs.get(zid)
+        if avg is None:
+            return
+        n = len(buckets.get(zid) or [])
+        ax.text(
+            cx,
+            cy,
+            f"{avg:.0f} {unit}\n{n}/{total_n}",
+            ha="center",
+            va="center",
+            color="white",
+            fontsize=7,
+            fontweight="bold",
+            zorder=4,
+        )
+
+    for zid, verts in _outer_zone_polys():
+        ax.add_patch(
+            Polygon(
+                verts,
+                closed=True,
+                facecolor=_zone_color(zid),
+                edgecolor="white",
+                linewidth=0.8,
+                alpha=0.9,
+                zorder=1,
+            )
+        )
+        xs = [v[0] for v in verts]
+        ys = [v[1] for v in verts]
+        _zone_label(zid, sum(xs) / len(xs), sum(ys) / len(ys))
+
+    for zid, x0, y0, w, h in _core_rects():
+        ax.add_patch(
+            Rectangle(
+                (x0, y0),
+                w,
+                h,
+                facecolor=_zone_color(zid),
+                edgecolor="white",
+                linewidth=0.8,
+                alpha=0.9,
+                zorder=2,
+            )
+        )
+        _zone_label(zid, x0 + w / 2, y0 + h / 2)
+
+    _draw_home_plate_unit(ax, zorder=6)
+
+    # Contact overlay (clipped to the unit frame)
     xs = [p[0] for p in scatter]
     ys = [p[1] for p in scatter]
-    ax.scatter(xs, ys, c="#60a5fa", s=12, alpha=0.55, edgecolors="none", zorder=5)
+    ax.scatter(
+        xs,
+        ys,
+        c="#60a5fa",
+        s=12,
+        alpha=0.55,
+        edgecolors="none",
+        zorder=5,
+        clip_on=True,
+    )
 
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
@@ -261,92 +600,187 @@ def _zone_heatmap(contacts: list[dict[str, Any]], metric: str, title: str, unit:
     return data
 
 
-def _ev_depth_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
-    """Depth of contact from Intersect1 (m → inches); home plate at 0."""
-    pts: list[tuple[float, float, float]] = []  # depth_in, plate_x, ev
+def _plate_vertical_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
+    """
+    Catcher's view: plate lateral × height, EV-colored.
+    Inch markers on both axes (plate width ≈ 17", zone height ≈ 18–42").
+    """
+    pts: list[tuple[float, float, float]] = []
     for c in contacts:
+        xy = _plate_xy(c)
+        ev = c.get("ev")
+        if xy is None or ev is None:
+            continue
+        # Convert unit plate coords → inches (catcher's view)
+        lat_in = (xy[0] - 0.5) * 17.0
+        # Unit y 0.25→18" (bottom zone), 0.75→42" (top zone)
+        height_in = 18.0 + (xy[1] - 0.25) * 48.0
+        pts.append((lat_in, height_in, float(ev)))
+    if not pts:
+        return None
+
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle, Polygon
+
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    evs = [p[2] for p in pts]
+
+    fig, ax = plt.subplots(figsize=(4.4, 4.8), facecolor=DARK_BG)
+    ax.set_facecolor(DARK_BG)
+
+    # Strike zone guide in inches
+    ax.add_patch(
+        Rectangle(
+            (-8.5, 18.0),
+            17.0,
+            24.0,
+            fill=False,
+            edgecolor="white",
+            linewidth=1.2,
+            linestyle="--",
+            alpha=0.7,
+            zorder=2,
+        )
+    )
+    # Home plate under the zone (catcher's view, tip toward catcher / down)
+    ax.add_patch(
+        Polygon(
+            [
+                (-8.5, 8.0),
+                (-8.5, 2.0),
+                (0.0, -2.0),
+                (8.5, 2.0),
+                (8.5, 8.0),
+            ],
+            closed=True,
+            facecolor="white",
+            edgecolor="white",
+            alpha=0.35,
+            linewidth=1.0,
+            zorder=3,
+        )
+    )
+    sc = ax.scatter(
+        xs, ys, c=evs, cmap="YlOrRd", s=36, edgecolors="white", linewidths=0.35, alpha=0.9, zorder=4
+    )
+    cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+    cbar.ax.yaxis.set_tick_params(color="white", labelcolor="white")
+    cbar.outline.set_edgecolor("white")
+    cbar.set_label("EV (mph)", color="white", fontsize=8)
+
+    # Inch markers
+    y_lo = min(-4.0, min(ys) - 4)
+    y_hi = max(48.0, max(ys) + 4)
+    ax.set_xlim(-20, 20)
+    ax.set_ylim(y_lo, y_hi)
+    ax.set_aspect("equal")
+    x_ticks = [-17, -8.5, 0, 8.5, 17]
+    y_ticks = [0, 18, 30, 42]
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels([f"{t:g}\"" for t in x_ticks], color="white", fontsize=7)
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels([f"{t:g} IN" for t in y_ticks], color="white", fontsize=7)
+    ax.tick_params(colors="white", length=3)
+    ax.grid(True, which="major", color="white", alpha=0.18, linewidth=0.6, zorder=1)
+    for spine in ax.spines.values():
+        spine.set_color("white")
+    ax.set_title("Contact location (vertical)", color="white", fontsize=11, pad=8)
+    ax.set_xlabel("← Glove   Plate   Arm →", color="#9ca3af", fontsize=7, labelpad=4)
+    ax.set_ylabel("Height", color="#9ca3af", fontsize=7)
+    fig.patch.set_facecolor(DARK_BG)
+    data = _png_bytes(fig, facecolor=DARK_BG)
+    _close(fig)
+    return data
+
+
+def _plate_horizontal_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
+    """
+    EV by depth of contact: lateral × depth inches, with inch markers like HitTrax.
+    +depth = out in front of the plate (toward pitcher).
+    """
+    pts: list[tuple[float, float, float]] = []
+    for c in contacts:
+        xy = _plate_xy(c)
         i1 = c.get("intersect1")
         ev = c.get("ev")
-        if i1 is None or ev is None:
+        if xy is None or i1 is None or ev is None:
             continue
+        # x: inches across plate (~17" wide), y: depth inches
+        lat_in = (xy[0] - 0.5) * 17.0
         depth_in = float(i1) * M_TO_IN
-        xy = _plate_xy(c)
-        px = (xy[0] - 0.5) if xy else 0.0  # center plate
-        pts.append((depth_in, px * 17.0, float(ev)))  # ~plate width inches scale
+        pts.append((lat_in, depth_in, float(ev)))
     if not pts:
         return None
 
     import matplotlib.pyplot as plt
     from matplotlib.patches import Polygon
 
-    depths = [p[0] for p in pts]
-    xs = [p[1] for p in pts]
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
     evs = [p[2] for p in pts]
 
-    fig, ax = plt.subplots(figsize=(4.0, 4.2), facecolor=DARK_BG)
+    fig, ax = plt.subplots(figsize=(4.8, 4.6), facecolor=DARK_BG)
     ax.set_facecolor(DARK_BG)
 
-    # Home plate glyph near depth = 0
+    # Top-down home plate (tip toward pitcher = +depth / up the page)
     plate = Polygon(
-        [(-8.5, -2), (-8.5, 4), (0, 8), (8.5, 4), (8.5, -2)],
+        [(-8.5, 0), (-8.5, 8.5), (0, 17), (8.5, 8.5), (8.5, 0)],
         closed=True,
         facecolor="#9ca3af",
         edgecolor="white",
-        alpha=0.3,
+        alpha=0.35,
         linewidth=1.0,
         zorder=1,
     )
     ax.add_patch(plate)
 
-    band_edges = list(range(-24, 25, 6))
-    for y in band_edges:
-        ax.axhline(y, color="white", lw=0.4, alpha=0.35, zorder=2)
-        ax.text(-16, y, f"{y} IN", color="white", fontsize=6, va="center", ha="right")
-
-    # Avg EV per band
-    for i in range(len(band_edges) - 1):
-        lo_b, hi_b = band_edges[i], band_edges[i + 1]
-        band_evs = [e for d, _, e in pts if lo_b <= d < hi_b]
-        mid = (lo_b + hi_b) / 2
-        if band_evs:
-            ax.text(
-                16,
-                mid,
-                f"{sum(band_evs) / len(band_evs):.1f} mph",
-                color="white",
-                fontsize=6,
-                va="center",
-                ha="left",
-            )
-        else:
-            ax.text(16, mid, "0.0 mph", color="#9ca3af", fontsize=6, va="center", ha="left")
-
     sc = ax.scatter(
-        xs,
-        depths,
-        c=evs,
-        cmap="turbo",
-        s=28,
-        alpha=0.9,
-        edgecolors="white",
-        linewidths=0.3,
-        zorder=4,
+        xs, ys, c=evs, cmap="turbo", s=36, edgecolors="white", linewidths=0.35, alpha=0.9, zorder=4
     )
-    cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.08)
+    cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.06)
     cbar.ax.yaxis.set_tick_params(color="white", labelcolor="white")
     cbar.outline.set_edgecolor("white")
     cbar.set_label("EV (mph)", color="white", fontsize=8)
 
-    y_pad = max(abs(min(depths)), abs(max(depths)), 18) + 4
-    ax.set_ylim(-y_pad, y_pad)
+    depth_ticks = [18, 6, 0, -6, -18]
+    y_pad = max(abs(min(ys)), abs(max(ys)), 20) + 4
     ax.set_xlim(-18, 18)
-    ax.set_xticks([])
-    ax.set_yticks([])
+    ax.set_ylim(-y_pad, y_pad)
+    ax.set_xticks([-17, -8.5, 0, 8.5, 17])
+    ax.set_xticklabels(["-17\"", "-8.5\"", "0\"", "8.5\"", "17\""], color="white", fontsize=7)
+    ax.set_yticks(depth_ticks)
+    ax.set_yticklabels([f"{t:+d} IN" if t != 0 else "0 IN" for t in depth_ticks], color="white", fontsize=7)
+    ax.tick_params(colors="white", length=3)
+    for y in depth_ticks:
+        ax.axhline(y, color="white", lw=0.6, alpha=0.28, zorder=2)
+    ax.axhline(0, color="white", lw=0.9, alpha=0.45, zorder=2)
+
+    # Mean EV per depth band (right-side callouts, matching example style)
+    bands = [(18, 6), (6, 0), (0, -6), (-6, -18)]
+    x_right = ax.get_xlim()[1]
+    for hi, lo in bands:
+        band_evs = [ev for (_, y, ev) in pts if lo <= y <= hi]
+        if not band_evs:
+            continue
+        mid = (hi + lo) / 2
+        ax.text(
+            x_right - 0.4,
+            mid,
+            f"{statistics.mean(band_evs):.1f} mph",
+            ha="right",
+            va="center",
+            color="white",
+            fontsize=7,
+            alpha=0.9,
+            zorder=5,
+        )
+
     for spine in ax.spines.values():
         spine.set_color("white")
     ax.set_title("EV by Depth of Contact", color="white", fontsize=11, pad=8)
-    ax.set_ylabel("Depth (in)", color="white", fontsize=8)
-    ax.yaxis.label.set_color("white")
+    ax.set_xlabel("← Glove   Plate   Arm →", color="#9ca3af", fontsize=7, labelpad=4)
+    ax.set_ylabel("Depth (out front +, deep −)", color="#9ca3af", fontsize=7)
     fig.patch.set_facecolor(DARK_BG)
     data = _png_bytes(fig, facecolor=DARK_BG)
     _close(fig)
@@ -355,8 +789,7 @@ def _ev_depth_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
 
 def build_hittrax_chart_images(contacts: list[dict[str, Any]]) -> dict[str, bytes]:
     """
-    Keys: ev_la, spray, zone_ev, zone_la, ev_depth
-    (legacy PBH scatter omitted — zone heatmaps replace it)
+    Keys: ev_la, spray, zone_ev, zone_la, plate_vert, plate_horiz
     """
     _ensure_mpl()
     out: dict[str, bytes] = {}
@@ -371,7 +804,8 @@ def build_hittrax_chart_images(contacts: list[dict[str, Any]]) -> dict[str, byte
             "zone_la",
             lambda: _zone_heatmap(contacts, "launch_angle", "Average Launch Angle by Zone", "°"),
         ),
-        ("ev_depth", lambda: _ev_depth_chart(contacts)),
+        ("plate_vert", lambda: _plate_vertical_chart(contacts)),
+        ("plate_horiz", lambda: _plate_horizontal_chart(contacts)),
     ]
     for key, fn in builders:
         try:
@@ -715,7 +1149,7 @@ def build_vald_chart_images(series: dict[str, Any]) -> dict[str, bytes]:
                 "RSI-modified",
                 series.get("cmj") or [],
                 "RSI-modified",
-                "",
+                "m/s",
             ),
         ),
         (

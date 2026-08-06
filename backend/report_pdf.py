@@ -14,6 +14,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     Image,
     KeepTogether,
@@ -42,6 +43,162 @@ def _fmt(val: Any) -> str:
     if isinstance(val, float):
         return f"{val:.1f}"
     return str(val)
+
+
+def _ordinal(n: int) -> str:
+    if 10 <= (n % 100) <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _assessment_type_label(current: dict[str, Any]) -> str:
+    raw = (current.get("assessment_type") or "").strip().lower()
+    if raw == "retest":
+        n = current.get("retest_number")
+        if isinstance(n, int) and n >= 1:
+            return f"{_ordinal(n)} Retest"
+        return "Retest"
+    if raw:
+        return raw.capitalize()
+    return ""
+
+
+def _inline_markdown_to_rl(text: str) -> str:
+    """
+    Convert a small Markdown subset to ReportLab Paragraph markup.
+
+    Supported inline: **bold**, *italic*, ***both***, `code`, and the
+    underscore equivalents. Escapes XML first so raw <>& stay safe.
+    """
+    s = escape(text or "")
+    # Bold+italic first so nested markers are not partially consumed.
+    s = re.sub(r"\*\*\*(.+?)\*\*\*", r"<b><i>\1</i></b>", s)
+    s = re.sub(r"___(.+?)___", r"<b><i>\1</i></b>", s)
+    s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+    s = re.sub(r"__(.+?)__", r"<b>\1</b>", s)
+    s = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<i>\1</i>", s)
+    s = re.sub(r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)", r"<i>\1</i>", s)
+    s = re.sub(
+        r"`([^`]+)`",
+        lambda m: (
+            '<font face="Courier" size="8">'
+            + m.group(1)
+            + "</font>"
+        ),
+        s,
+    )
+    return s
+
+
+def _notes_flowables(notes_text: str, styles) -> list:
+    """
+    Turn assessment notes into ReportLab flowables.
+
+    Supports:
+      - blank-line paragraphs
+      - # / ## / ### headings
+      - - or * bullets
+      - 1. numbered lists
+      - inline bold / italic / code (see _inline_markdown_to_rl)
+    Plain text still works unchanged.
+    """
+    body = ParagraphStyle(
+        "CoachNotes",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=12,
+        textColor=MUTED,
+        spaceBefore=2,
+        spaceAfter=4,
+    )
+    bullet = ParagraphStyle(
+        "CoachNotesBullet",
+        parent=body,
+        leftIndent=14,
+        firstLineIndent=-10,
+        spaceBefore=1,
+        spaceAfter=1,
+    )
+    heading = ParagraphStyle(
+        "CoachNotesHeading",
+        parent=body,
+        fontName="Helvetica-Bold",
+        fontSize=10,
+        leading=13,
+        textColor=colors.HexColor("#0b3d5c"),
+        spaceBefore=8,
+        spaceAfter=4,
+    )
+
+    flow: list = []
+    lines = notes_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    paragraph_buf: list[str] = []
+
+    def flush_paragraph() -> None:
+        nonlocal paragraph_buf
+        if not paragraph_buf:
+            return
+        text = " ".join(part.strip() for part in paragraph_buf if part.strip())
+        paragraph_buf = []
+        if text:
+            flow.append(Paragraph(_inline_markdown_to_rl(text), body))
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if not stripped:
+            flush_paragraph()
+            continue
+
+        heading_match = re.match(r"^(#{1,3})\s+(.+)$", stripped)
+        bullet_match = re.match(r"^[-*]\s+(.+)$", stripped)
+        number_match = re.match(r"^(\d+)[.)]\s+(.+)$", stripped)
+
+        if heading_match:
+            flush_paragraph()
+            level = len(heading_match.group(1))
+            size = {1: 11, 2: 10, 3: 9}[level]
+            style = ParagraphStyle(
+                f"CoachNotesH{level}",
+                parent=heading,
+                fontSize=size,
+                leading=size + 3,
+            )
+            flow.append(
+                Paragraph(
+                    f"<b>{_inline_markdown_to_rl(heading_match.group(2))}</b>",
+                    style,
+                )
+            )
+            continue
+
+        if bullet_match:
+            flush_paragraph()
+            flow.append(
+                Paragraph(
+                    f"• {_inline_markdown_to_rl(bullet_match.group(1))}",
+                    bullet,
+                )
+            )
+            continue
+
+        if number_match:
+            flush_paragraph()
+            flow.append(
+                Paragraph(
+                    f"{number_match.group(1)}. "
+                    f"{_inline_markdown_to_rl(number_match.group(2))}",
+                    bullet,
+                )
+            )
+            continue
+
+        paragraph_buf.append(stripped)
+
+    flush_paragraph()
+    return flow
 
 
 def _delta_values(curr: Optional[float], other: Optional[float]) -> tuple[str, Optional[str]]:
@@ -126,17 +283,21 @@ def _comparison_table(
     return flow
 
 
-def _append_image_grid(story: list, images: list, col_width: float = 3.5 * inch) -> None:
-    """Append ReportLab Images in rows of up to 2."""
+def _append_image_grid(
+    story: list,
+    images: list,
+    col_width: float = 3.5 * inch,
+    per_row: int = 2,
+) -> None:
+    """Append ReportLab Images in rows of up to `per_row`."""
     if not images:
         return
     rows: list = []
-    for i in range(0, len(images), 2):
-        chunk = images[i : i + 2]
-        if len(chunk) == 1:
-            chunk = chunk + [""]
+    for i in range(0, len(images), per_row):
+        chunk = list(images[i : i + per_row])
+        chunk += [""] * (per_row - len(chunk))
         rows.append(chunk)
-    table = Table(rows, colWidths=[col_width, col_width])
+    table = Table(rows, colWidths=[col_width] * per_row)
     table.setStyle(
         TableStyle(
             [
@@ -187,6 +348,8 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
         fontSize=13,
         spaceBefore=14,
         spaceAfter=8,
+        # Never leave a section heading stranded at the bottom of a page.
+        keepWithNext=1,
     )
     cell_style = ParagraphStyle(
         "HeatCell",
@@ -222,14 +385,27 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
     story: list = []
 
     # --- Header: player meta left, logo + title top-right ---
-    assessment_type = (current.get("assessment_type") or "").strip().capitalize()
+    assessment_type = _assessment_type_label(current)
     left_bits = [
         Paragraph(f"<b>{current['player_name']}</b>", player_style),
         Paragraph(
-            f"{assessment_type} · Assessment #{current['assessment_id']}",
+            f"{assessment_type} · Assessment ID: {current['assessment_id']}",
             subtitle,
         ),
     ]
+    video_url = (
+        bundle.get("video_analysis_url")
+        or current.get("video_analysis_url")
+        or ""
+    ).strip()
+    if video_url:
+        safe_url = escape(video_url)
+        left_bits.append(
+            Paragraph(
+                f'Video Link — <link href="{safe_url}" color="blue"><u>{safe_url}</u></link>',
+                subtitle,
+            )
+        )
     if previous:
         left_bits.append(
             Paragraph(
@@ -291,32 +467,42 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
     base_b = (baseline or {}).get("blast") or {}
     base_h = (baseline or {}).get("hittrax") or {}
     base_v = (baseline or {}).get("vald") or {}
+    used_blast = bool(current.get("used_blast", True))
+    used_hittrax = bool(current.get("used_hittrax", True))
+    used_vald = bool(current.get("used_vald", True))
 
     # --- Current snapshot (requested metrics) ---
-    story.append(Paragraph("Current Snapshot", section))
-    snap = [
-        ["Peak Exit Velocity (mph)", _fmt(ht.get("peak_ev"))],
-        ["Peak Bat Speed (mph)", _fmt(blast.get("peak_bat_speed"))],
-        ["SD Attack Angle (deg)", _fmt(blast.get("sd_attack_angle"))],
-    ]
-    t = Table(snap, colWidths=[3.2 * inch, 2.2 * inch])
-    t.setStyle(
-        TableStyle(
+    snap = []
+    if used_hittrax:
+        snap.append(["Peak Exit Velocity (mph)", _fmt(ht.get("peak_ev"))])
+    if used_blast:
+        snap.extend(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f5f7fa")),
-                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d0d7de")),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ["Peak Bat Speed (mph)", _fmt(blast.get("peak_bat_speed"))],
+                ["SD Attack Angle (deg)", _fmt(blast.get("sd_attack_angle"))],
             ]
         )
-    )
-    story.append(t)
+    if snap:
+        story.append(Paragraph("Current Snapshot", section))
+        t = Table(snap, colWidths=[3.2 * inch, 2.2 * inch])
+        t.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f5f7fa")),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d0d7de")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        story.append(t)
 
     # --- HitTrax ---
-    story.extend(
+    if used_hittrax:
+        story.extend(
         _comparison_table(
             "Batted Ball Profile (HitTrax)",
             colors.HexColor("#0b3d5c"),
@@ -364,7 +550,8 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
     )
 
     # --- Blast ---
-    story.extend(
+    if used_blast:
+        story.extend(
         _comparison_table(
             "Blast Motion",
             colors.HexColor("#fcba39"),
@@ -414,49 +601,82 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
         )
     )
 
-    # --- Batted Ball Visuals (HitTrax charts) + coach notes ---
+    # --- Batted Ball Visuals (HitTrax charts) ---
     contacts = current.get("hittrax_contacts") or []
-    chart_images = report_charts.build_hittrax_chart_images(contacts)
-    notes_text = (bundle.get("notes") or current.get("notes") or "").strip()
-    if chart_images or notes_text:
+    chart_images = (
+        report_charts.build_hittrax_chart_images(contacts)
+        if used_hittrax
+        else {}
+    )
+    if chart_images:
         story.append(PageBreak())
         story.append(Paragraph("Batted Ball Visuals", section))
-        # Primary HitTrax-style charts first, then EV×LA / spray
-        chart_order = (
-            ("zone_ev", 3.2 * inch),
-            ("zone_la", 3.2 * inch),
-            ("ev_depth", 3.2 * inch),
-            ("ev_la", 3.2 * inch),
-            ("spray", 3.2 * inch),
+        chart_context = bundle.get("hittrax_chart_context") or {}
+        caption_style = ParagraphStyle(
+            "HittraxChartCaption",
+            parent=styles["Normal"],
+            fontSize=7.5,
+            leading=9,
+            textColor=MUTED,
+            alignment=1,
+            spaceBefore=2,
+            spaceAfter=6,
+        )
+        # Zone + plate charts in a 2-column grid, then EV×LA and spray stacked
+        # full-width so the spray chart can be emphasized larger.
+        grid_order = (
+            ("zone_ev", 3.2 * inch, True),
+            ("zone_la", 3.2 * inch, True),
+            ("plate_vert", 3.2 * inch, True),
+            ("plate_horiz", 3.2 * inch, True),
         )
         chart_cells: list = []
-        for key, width in chart_order:
+        for key, width, tall in grid_order:
             png = chart_images.get(key)
             if not png:
                 continue
-            img = Image(BytesIO(png), width=width, height=width * 0.95 if key.startswith("zone") or key == "ev_depth" else width * 0.78)
-            img.hAlign = "CENTER"
-            chart_cells.append(img)
-        _append_image_grid(story, chart_cells)
-        if notes_text:
-            notes_style = ParagraphStyle(
-                "CoachNotes",
-                parent=styles["Normal"],
-                fontSize=9,
-                leading=12,
-                textColor=MUTED,
-                spaceBefore=4,
+            img = Image(
+                BytesIO(png),
+                width=width,
+                height=width * (0.95 if tall else 0.78),
             )
-            story.append(Paragraph("<b>Coach notes</b>", section))
-            html = escape(notes_text).replace("\n", "<br/>")
-            story.append(Paragraph(html, notes_style))
+            img.hAlign = "CENTER"
+            ctx = (chart_context.get(key) or "").strip()
+            if ctx:
+                chart_cells.append([img, Paragraph(escape(ctx), caption_style)])
+            else:
+                chart_cells.append(img)
+        _append_image_grid(story, chart_cells)
+
+        # EV×LA + spray on their own page, stacked, kept together
+        if chart_images.get("ev_la") or chart_images.get("spray"):
+            story.append(PageBreak())
+            stacked_blocks: list = []
+            stacked = (
+                ("ev_la", 4.8 * inch, 0.82),
+                ("spray", 6.0 * inch, 0.70),
+            )
+            for key, width, aspect in stacked:
+                png = chart_images.get(key)
+                if not png:
+                    continue
+                img = Image(BytesIO(png), width=width, height=width * aspect)
+                img.hAlign = "CENTER"
+                stacked_blocks.append(img)
+                ctx = (chart_context.get(key) or "").strip()
+                if ctx:
+                    stacked_blocks.append(Paragraph(escape(ctx), caption_style))
+                stacked_blocks.append(Spacer(1, 6))
+            if stacked_blocks:
+                story.append(KeepTogether(stacked_blocks))
 
     # --- VALD ForceDecks (best of day) — start on next page with header+table together ---
-    story.append(PageBreak())
-    story.append(
+    if used_vald:
+        if snap or used_hittrax or used_blast or chart_images:
+            story.append(PageBreak())
+        story.append(
         KeepTogether(
-            _comparison_table(
-                "VALD ForceDecks (best of day)",
+            _comparison_table(                "VALD ForceDecks (best of day)",
                 colors.HexColor("#111521"),
                 colors.HexColor("#fcba39"),
                 [
@@ -521,14 +741,60 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
                 cell_style,
             )
         )
-    )
+        )
+
+        # Metric definitions (from vald_dictionary when available)
+        vald_defs = bundle.get("vald_definitions") or []
+        if vald_defs:
+            def_heading = ParagraphStyle(
+                "ValdDefHeading",
+                parent=styles["Normal"],
+                fontName="Helvetica-Bold",
+                fontSize=9,
+                leading=11,
+                textColor=colors.HexColor("#0b3d5c"),
+                spaceBefore=10,
+                spaceAfter=2,
+                keepWithNext=1,
+            )
+            def_body = ParagraphStyle(
+                "ValdDefBody",
+                parent=styles["Normal"],
+                fontSize=8,
+                leading=10,
+                textColor=MUTED,
+                spaceAfter=6,
+            )
+            story.append(Paragraph("Metric definitions", section))
+            for item in vald_defs:
+                label = escape(item.get("label") or "")
+                unit = (item.get("unit") or "").strip()
+                unit_bit = f" ({escape(unit)})" if unit else ""
+                desc = escape(item.get("description") or "")
+                story.append(Paragraph(f"{label}{unit_bit}", def_heading))
+                story.append(Paragraph(desc, def_body))
 
     # --- VALD Visuals (Looker-style cards) ---
     vald_series = current.get("vald_series") or {}
-    vald_cards = report_charts.build_vald_chart_images(vald_series)
+    vald_cards = (
+        report_charts.build_vald_chart_images(vald_series)
+        if used_vald
+        else {}
+    )
     if vald_cards:
         story.append(PageBreak())
         story.append(Paragraph("VALD ForceDecks", section))
+        card_context = bundle.get("vald_card_context") or {}
+        caption_style = ParagraphStyle(
+            "ValdCardCaption",
+            parent=styles["Normal"],
+            fontSize=7.5,
+            leading=9,
+            textColor=MUTED,
+            alignment=1,
+            spaceBefore=2,
+            spaceAfter=6,
+        )
         card_order = (
             "imtp_force_trend",
             "imtp_rfd150_bilat",
@@ -546,14 +812,28 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
                 continue
             img = Image(BytesIO(png), width=3.45 * inch, height=1.85 * inch)
             img.hAlign = "CENTER"
-            card_imgs.append(img)
+            ctx = (card_context.get(key) or "").strip()
+            if ctx:
+                card_imgs.append(
+                    [img, Paragraph(escape(ctx), caption_style)]
+                )
+            else:
+                card_imgs.append(img)
         _append_image_grid(story, card_imgs, col_width=3.55 * inch)
 
     # --- Trainer visuals (uploaded context images) ---
     trainer_visuals = bundle.get("trainer_visuals") or []
+    trainer_visuals = [
+        item
+        for item in trainer_visuals
+        if not (
+            ((item.get("slot") or "").strip() == "blast" and not used_blast)
+            or ((item.get("slot") or "").strip() == "hittrax" and not used_hittrax)
+            or ((item.get("slot") or "").strip() == "vald" and not used_vald)
+        )
+    ]
     if trainer_visuals:
         story.append(PageBreak())
-        story.append(Paragraph("Trainer Visuals", section))
         caption_style = ParagraphStyle(
             "TrainerCaption",
             parent=styles["Normal"],
@@ -563,28 +843,100 @@ def build_pdf(bundle: dict[str, Any], output_path: Optional[str] = None) -> str:
             alignment=1,
             spaceAfter=8,
         )
-        cells: list = []
-        for item in trainer_visuals:
+        mechanics_labels = {
+            "load_phase": "1. Load Phase",
+            "load_position": "2. Load Position",
+            "stride_phase": "3. Stride Phase",
+            "launch_position": "4. Launch Position",
+            "impact": "5. Impact",
+        }
+        mechanics_order = {k: i for i, k in enumerate(mechanics_labels)}
+
+        def _visual_cell(
+            item: dict,
+            label_override: str | None = None,
+            max_width: float = 3.3 * inch,
+            max_height: float = 3.0 * inch,
+        ):
             raw = item.get("bytes")
             if not raw:
-                continue
+                return None
             try:
-                        img = Image(BytesIO(raw), width=3.3 * inch)
-                        img.hAlign = "CENTER"
+                image_width, image_height = ImageReader(BytesIO(raw)).getSize()
+                scale = min(
+                    max_width / image_width,
+                    max_height / image_height,
+                    1.0,
+                )
+                img = Image(
+                    BytesIO(raw),
+                    width=image_width * scale,
+                    height=image_height * scale,
+                )
+                img.hAlign = "CENTER"
             except Exception:
-                continue
+                return None
             cap = (item.get("caption") or "").strip()
             slot = (item.get("slot") or "").strip()
-            label_bits = []
-            if slot and slot not in ("other", "context"):
+            label_bits: list[str] = []
+            if label_override:
+                label_bits.append(label_override)
+            elif slot and slot not in ("other", "context"):
                 label_bits.append(slot.replace("_", " ").title())
             if cap:
                 label_bits.append(escape(cap))
             block: list = [img]
             if label_bits:
                 block.append(Paragraph(" — ".join(label_bits), caption_style))
-            cells.append(KeepTogether(block))
-        _append_image_grid(story, cells, col_width=3.5 * inch)
+            # A table cell already keeps its contents together. Wrapping the
+            # cell in KeepTogether reports an effectively infinite height to
+            # ReportLab and causes a LayoutError.
+            return block
+
+        mechanics_items = [
+            i for i in trainer_visuals if (i.get("slot") or "") in mechanics_labels
+        ]
+        other_items = [
+            i for i in trainer_visuals if (i.get("slot") or "") not in mechanics_labels
+        ]
+        mechanics_items.sort(
+            key=lambda i: mechanics_order.get(i.get("slot") or "", 99)
+        )
+
+        if mechanics_items:
+            # 3 across keeps all five phases on a single page.
+            story.append(Paragraph("Mechanics", section))
+            cells = []
+            for item in mechanics_items:
+                slot = (item.get("slot") or "").strip()
+                cell = _visual_cell(
+                    item,
+                    mechanics_labels.get(slot),
+                    max_width=2.1 * inch,
+                    max_height=3.3 * inch,
+                )
+                if cell:
+                    cells.append(cell)
+            _append_image_grid(story, cells, col_width=2.2 * inch, per_row=3)
+
+        if other_items:
+            if mechanics_items:
+                story.append(PageBreak())
+            story.append(Paragraph("Other Trainer Visuals", section))
+            cells = []
+            for item in other_items:
+                cell = _visual_cell(item)
+                if cell:
+                    cells.append(cell)
+            _append_image_grid(story, cells, col_width=3.5 * inch)
+
+    # --- Assessment notes (always last) ---
+    notes_text = (bundle.get("notes") or current.get("notes") or "").strip()
+    if notes_text:
+        if snap or used_hittrax or used_blast or used_vald or chart_images or trainer_visuals:
+            story.append(PageBreak())
+        story.append(Paragraph("Assessment Notes", section))
+        story.extend(_notes_flowables(notes_text, styles))
 
     doc.build(story)
     return output_path

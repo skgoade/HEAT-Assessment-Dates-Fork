@@ -68,7 +68,8 @@ def _fetch_peer(conn, assessment_id: Optional[int]) -> Optional[dict]:
         cur.execute(
             """
             SELECT assessment_id, assessment_date, player_name, assessment_type,
-                   previous_assessment_id, trainer_name, notes
+                   previous_assessment_id, trainer_name, notes,
+                   used_blast, used_hittrax, used_vald
             FROM hitting_assessments
             WHERE assessment_id = %s
             """,
@@ -77,23 +78,23 @@ def _fetch_peer(conn, assessment_id: Optional[int]) -> Optional[dict]:
         return cur.fetchone()
 
 
-def _resolve_baseline_row(conn, player_name: str, current_id: Optional[int] = None) -> Optional[dict]:
+def _resolve_baseline_row(conn, player_name: str) -> Optional[dict]:
     """
     Baseline is never trainer-picked: earliest initial for the player,
-    else earliest assessment of any type. Skip the current row if passed.
+    else earliest assessment of any type.
     """
     with conn.cursor(dictionary=True) as cur:
         cur.execute(
             """
             SELECT assessment_id, assessment_date, player_name, assessment_type,
-                   previous_assessment_id, trainer_name, notes
+                   previous_assessment_id, trainer_name, notes,
+                   used_blast, used_hittrax, used_vald
             FROM hitting_assessments
             WHERE player_name = %s AND assessment_type = 'initial'
-              AND (%s IS NULL OR assessment_id <> %s)
             ORDER BY assessment_date ASC, assessment_id ASC
             LIMIT 1
             """,
-            (player_name, current_id, current_id),
+            (player_name,),
         )
         row = cur.fetchone()
         if row:
@@ -101,14 +102,14 @@ def _resolve_baseline_row(conn, player_name: str, current_id: Optional[int] = No
         cur.execute(
             """
             SELECT assessment_id, assessment_date, player_name, assessment_type,
-                   previous_assessment_id, trainer_name, notes
+                   previous_assessment_id, trainer_name, notes,
+                   used_blast, used_hittrax, used_vald
             FROM hitting_assessments
             WHERE player_name = %s
-              AND (%s IS NULL OR assessment_id <> %s)
             ORDER BY assessment_date ASC, assessment_id ASC
             LIMIT 1
             """,
-            (player_name, current_id, current_id),
+            (player_name,),
         )
         return cur.fetchone()
 
@@ -117,13 +118,55 @@ def get_comparison_peers(conn, current: dict) -> dict[str, Optional[dict]]:
     """
     previous = stored previous_assessment_id (trainer-confirmed prior).
     baseline = auto earliest initial for this player (not a form field).
+
+    An assessment that is itself the baseline has nothing to compare against,
+    so it reports no baseline rather than the next-oldest assessment.
+
+    When previous and baseline are the same assessment (typical 1st retest),
+    keep only previous so the PDF does not show two identical lines/columns.
     """
     previous = _fetch_peer(conn, current.get("previous_assessment_id"))
-    baseline = _resolve_baseline_row(
-        conn, current["player_name"], current.get("assessment_id")
-    )
-    # If "previous" is the same row as baseline, still fine to show once each.
+    baseline = _resolve_baseline_row(conn, current["player_name"])
+    if baseline and baseline["assessment_id"] == current.get("assessment_id"):
+        baseline = None
+    if (
+        previous
+        and baseline
+        and previous["assessment_id"] == baseline["assessment_id"]
+    ):
+        baseline = None
     return {"baseline": baseline, "previous": previous}
+
+
+def retest_number_for(conn, row: dict) -> Optional[int]:
+    """
+    1-based ordinal among this player's retests (by date, then id).
+
+    Returns None for initial assessments or non-retests.
+    """
+    if str(row.get("assessment_type") or "").strip().lower() != "retest":
+        return None
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM hitting_assessments
+            WHERE player_name = %s
+              AND assessment_type = 'retest'
+              AND (
+                    assessment_date < %s
+                 OR (assessment_date = %s AND assessment_id <= %s)
+              )
+            """,
+            (
+                row["player_name"],
+                row.get("assessment_date"),
+                row.get("assessment_date"),
+                row["assessment_id"],
+            ),
+        )
+        count = cur.fetchone()[0]
+    return int(count) if count else 1
 
 
 def _blast_rows(conn, player_name: str, start: datetime, end: datetime) -> list[dict]:
@@ -543,27 +586,219 @@ def aggregate_vald(conn, player_name: str, start: datetime, end: datetime) -> di
     }
 
 
+# Display label → VALD dictionary metric_name (from vald_dictionary / VALD API).
+VALD_METRIC_DEF_KEYS: list[tuple[str, str]] = [
+    ("CMJ Jump Height (FT)", "Jump Height (Flight Time)"),
+    ("CMJ Peak Power / BM", "Peak Power / BM"),
+    ("CMJ RSI-modified", "RSI-modified"),
+    ("SJ Jump Height (FT)", "Jump Height (Flight Time)"),
+    ("SJ Peak Power / BM", "Peak Power / BM"),
+    ("HJ Best RSI", "Best RSI (Jump Height/Contact Time)"),
+    ("HJ Best Jump Height", "Best Jump Height (Flight Time)"),
+    ("IMTP Peak Force / BM", "Peak Vertical Force / BM"),
+    ("IMTP RFD 100ms", "RFD - 100ms"),
+]
+
+# Short coach-facing fallbacks when vald_dictionary is unavailable.
+VALD_METRIC_DEF_FALLBACKS: dict[str, str] = {
+    "Jump Height (Flight Time)": (
+        "How high the athlete jumped, estimated from time in the air."
+    ),
+    "Peak Power / BM": (
+        "Peak mechanical power produced in the jump, scaled to body mass."
+    ),
+    "RSI-modified": (
+        "Jump height relative to time on the ground in the countermovement — "
+        "a quick indicator of reactive strength."
+    ),
+    "Best RSI (Jump Height/Contact Time)": (
+        "Hop reactivity: jump height divided by ground contact time. "
+        "Higher usually means faster elastic rebound."
+    ),
+    "Best Jump Height (Flight Time)": (
+        "Best hop jump height in the set, estimated from flight time."
+    ),
+    "Peak Vertical Force / BM": (
+        "Maximum isometric pulling force relative to body mass — "
+        "a strength capacity marker."
+    ),
+    "RFD - 100ms": (
+        "How quickly force rises in the first 100 milliseconds of the pull — "
+        "early explosive strength."
+    ),
+    "RFD - 150ms": (
+        "How quickly force rises in the first 150 milliseconds of the pull."
+    ),
+    "Mean RSI (Jump Height/Contact Time)": (
+        "Average hop reactivity across trials (jump height / contact time)."
+    ),
+}
+
+# Context shown under each Looker-style VALD chart card.
+VALD_CARD_CONTEXT: dict[str, str] = {
+    "imtp_force_trend": (
+        "Trend of peak isometric force / body mass over recent tests. "
+        "Rising values usually indicate improving lower-body strength capacity."
+    ),
+    "imtp_rfd150_bilat": (
+        "Left vs right rate of force development early in the pull. "
+        "Large asymmetry can highlight side-to-side differences to monitor."
+    ),
+    "hj_rsi_trend": (
+        "Hop reactive strength index over time. Higher RSI generally reflects "
+        "faster, springier rebound off the ground."
+    ),
+    "hj_force_bilat": (
+        "Peak force by limb during hops. Use the asymmetry line to spot "
+        "persistent left/right differences."
+    ),
+    "cmj_jh_trend": (
+        "Countermovement jump height history. A primary marker of lower-body "
+        "power expression in a sport-relevant movement."
+    ),
+    "cmj_rsi_trend": (
+        "CMJ RSI-modified over time — jump output relative to time on the "
+        "ground in the countermovement."
+    ),
+    "sj_jh_trend": (
+        "Squat jump height history (little/no countermovement). Useful for "
+        "concentric-only power without the stretch-shortening assist."
+    ),
+    "sj_rfd_bilat": (
+        "Concentric rate of force development by limb in the squat jump. "
+        "Asymmetry flags uneven push-off contributions."
+    ),
+}
+
+# Context shown under each HitTrax / batted-ball chart.
+HITTRAX_CHART_CONTEXT: dict[str, str] = {
+    "zone_ev": (
+        "Average exit velocity by pitch location (13-zone). Hotter cells are "
+        "where the hitter is driving the ball hardest; dots are individual contacts."
+    ),
+    "zone_la": (
+        "Average launch angle by pitch location. Use with the EV zone chart to "
+        "see whether hard contact is also leaving at a useful trajectory."
+    ),
+    "plate_vert": (
+        "Catcher's view of contact height × lateral location (inch markers), "
+        "colored by EV. Dashed box is the strike zone; clustering shows where "
+        "balls are being attacked."
+    ),
+    "plate_horiz": (
+        "EV by depth of contact (inch markers): lateral location × depth relative "
+        "to the plate. Positive depth is out in front; band mph callouts summarize "
+        "average exit velo at each depth."
+    ),
+    "ev_la": (
+        "Each dot is a batted ball (color = flight type). The navy line is the EV↔LA "
+        "trend; the blue curve is a hang-time proxy (EV·sin LA). Optimal LA is where "
+        "that proxy peaks — typically near ~80° when EV falls only gently with LA."
+    ),
+    "spray": (
+        "Field spray of batted balls (direction × distance), colored by exit velocity. "
+        "Shows pull/oppo tendency and how hard contact is distributed across the field."
+    ),
+}
+
+
+def fetch_vald_metric_definitions(
+    conn, metric_names: list[str]
+) -> dict[str, dict[str, str]]:
+    """
+    Look up descriptions from PlayerDev.vald_dictionary (loaded by
+    ReplayPlayerDev/APIs/Vald_Metric_Definitions.py).
+
+    Returns {metric_name: {description, unit}} for names that resolve.
+    """
+    names = [n for n in dict.fromkeys(metric_names) if n]
+    if not names:
+        return {}
+    try:
+        placeholders = ", ".join(["%s"] * len(names))
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                f"""
+                SELECT metric_name, description, unit
+                FROM vald_dictionary
+                WHERE metric_name IN ({placeholders})
+                """,
+                tuple(names),
+            )
+            rows = cur.fetchall() or []
+    except Exception as e:
+        logger.warning("vald_dictionary lookup failed: %s", e)
+        return {}
+
+    out: dict[str, dict[str, str]] = {}
+    for row in rows:
+        name = (row.get("metric_name") or "").strip()
+        if not name:
+            continue
+        desc = (row.get("description") or "").strip()
+        unit = (row.get("unit") or "").strip()
+        if desc:
+            out[name] = {"description": desc, "unit": unit}
+    return out
+
+
+def vald_definitions_for_report(conn) -> list[dict[str, str]]:
+    """Ordered unique definition rows for metrics shown in the VALD table."""
+    lookup_names = [vald_name for _, vald_name in VALD_METRIC_DEF_KEYS]
+    db_defs = fetch_vald_metric_definitions(conn, lookup_names)
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for _label, vald_name in VALD_METRIC_DEF_KEYS:
+        if vald_name in seen:
+            continue
+        seen.add(vald_name)
+        db = db_defs.get(vald_name) or {}
+        desc = (db.get("description") or "").strip() or VALD_METRIC_DEF_FALLBACKS.get(
+            vald_name, ""
+        )
+        if not desc:
+            continue
+        rows.append(
+            {
+                "label": vald_name,
+                "description": desc,
+                "unit": (db.get("unit") or "").strip(),
+            }
+        )
+    return rows
+
+
 def metrics_for_assessment(conn, row: dict, *, include_chart_series: bool = False) -> dict[str, Any]:
     """Blast + HitTrax + VALD aggregates for a single hitting_assessments row."""
     start, end = _window_bounds(row)
     player = row["player_name"]
-    blast_rows = _blast_rows(conn, player, start, end)
-    hittrax_rows = _hittrax_rows(conn, player, start, end)
+    used_blast = bool(row.get("used_blast", 1))
+    used_hittrax = bool(row.get("used_hittrax", 1))
+    used_vald = bool(row.get("used_vald", 1))
+    blast_rows = _blast_rows(conn, player, start, end) if used_blast else []
+    hittrax_rows = _hittrax_rows(conn, player, start, end) if used_hittrax else []
     out: dict[str, Any] = {
         "assessment_id": row["assessment_id"],
         "player_name": player,
         "assessment_type": row.get("assessment_type"),
         "assessment_date": row.get("assessment_date"),
+        "retest_number": retest_number_for(conn, row),
         "notes": row.get("notes"),
+        "video_analysis_url": row.get("video_analysis_url"),
         "start_ts": start,
         "end_ts": end,
-        "blast": aggregate_blast(blast_rows),
-        "hittrax": aggregate_hittrax(hittrax_rows),
+        "used_blast": used_blast,
+        "used_hittrax": used_hittrax,
+        "used_vald": used_vald,
+        "blast": aggregate_blast(blast_rows) if used_blast else {},
+        "hittrax": aggregate_hittrax(hittrax_rows) if used_hittrax else {},
         "hittrax_contacts": hittrax_contacts_for_charts(hittrax_rows) if include_chart_series else [],
-        "vald": aggregate_vald(conn, player, start, end),
+        "vald": aggregate_vald(conn, player, start, end) if used_vald else {},
     }
-    if include_chart_series:
+    if include_chart_series and used_vald:
         out["vald_series"] = vald_series_for_charts(conn, player, row.get("assessment_date"))
+    elif include_chart_series:
+        out["vald_series"] = {}
     return out
 
 
@@ -576,11 +811,23 @@ def build_report_bundle(conn, current: dict) -> dict[str, Any]:
     """
     peers = get_comparison_peers(conn, current)
     current_metrics = metrics_for_assessment(conn, current, include_chart_series=True)
+    vald_defs = (
+        vald_definitions_for_report(conn)
+        if current_metrics.get("used_vald", True)
+        else []
+    )
     return {
         "current": current_metrics,
         "previous": metrics_for_assessment(conn, peers["previous"]) if peers["previous"] else None,
         "baseline": metrics_for_assessment(conn, peers["baseline"]) if peers["baseline"] else None,
         "notes": current.get("notes") or current_metrics.get("notes"),
+        "video_analysis_url": (
+            current.get("video_analysis_url")
+            or current_metrics.get("video_analysis_url")
+        ),
+        "vald_definitions": vald_defs,
+        "vald_card_context": VALD_CARD_CONTEXT,
+        "hittrax_chart_context": HITTRAX_CHART_CONTEXT,
     }
 
 

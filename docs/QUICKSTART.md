@@ -88,7 +88,7 @@ Your system is now ready to use. Trainers can access the form at the frontend UR
 ### For Daily Use
 1. **Deploy Frontend**: Upload `frontend/index.html` to your web server
 2. **Bookmark**: Trainers should bookmark the form URL
-3. **Train Staff**: Show trainers how to fill out the form after assessments
+3. **Train Staff**: Share [docs/TRAINER_GUIDE.md](TRAINER_GUIDE.md) (submit flow, photos, regen, PDF contents)
 
 ### For Automated Reports
 

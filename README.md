@@ -1,8 +1,12 @@
 # RBI Hitting Assessment System
 
-A comprehensive system for tracking hitting assessments and automatically linking them with Blast Motion and HitTrax swing data for advanced player development and progress tracking.
+A comprehensive system for tracking hitting assessments and automatically linking them with Blast Motion, HitTrax, and VALD data for player development reporting.
 
-## 🎯 Overview
+## For trainers
+
+**[Trainer Guide](docs/TRAINER_GUIDE.md)** — how to submit assessments, upload mechanics photos, regenerate PDFs, and what shows up in the report.
+
+## Overview
 
 This system allows hitting trainers to input assessment data that is automatically linked with swing data from Blast Motion and HitTrax devices. The database views enable powerful automated reporting that compares:
 - Current assessment to previous assessment

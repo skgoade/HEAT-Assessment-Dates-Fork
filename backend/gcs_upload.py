@@ -55,6 +55,34 @@ def upload_pdf(local_path: str, object_name: Optional[str] = None) -> Optional[s
     return f"https://storage.googleapis.com/{bucket_name}/{object_name}"
 
 
+def delete_object(uri: str) -> bool:
+    """Best-effort delete of a previously uploaded object by https:// or gs:// URI."""
+    uri = (uri or "").strip()
+    if not uri:
+        return False
+
+    bucket_name = None
+    object_name = None
+    if uri.startswith("gs://"):
+        bucket_name, _, object_name = uri[len("gs://"):].partition("/")
+    elif uri.startswith("https://storage.googleapis.com/"):
+        rest = uri[len("https://storage.googleapis.com/"):]
+        bucket_name, _, object_name = rest.partition("/")
+    if not bucket_name or not object_name:
+        return False
+
+    try:
+        from google.cloud import storage
+
+        client = storage.Client()
+        client.bucket(bucket_name).blob(object_name).delete()
+        logger.info("Deleted gs://%s/%s", bucket_name, object_name)
+        return True
+    except Exception:
+        logger.exception("Failed deleting %s", uri)
+        return False
+
+
 def upload_bytes(
     data: bytes,
     *,

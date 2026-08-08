@@ -97,7 +97,7 @@ No need to click Load first (there is still a **Reload from saved assessment** b
 - **Add images:** use the mechanics / extra visual rows the same way as on a new submit.
 
 ### Generate
-Click **Generate PDF**. The PDF is rebuilt and uploaded; the success message includes the report link.
+Click **Generate PDF**. The PDF is rebuilt and uploaded as a **new version** (older PDFs stay available under **PDF version history**). The success message includes a signed link to open the latest draft.
 
 If player + visit lookup finds nothing, create a **new** assessment at the top of the form instead.
 
@@ -114,9 +114,11 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 | Mechanics + extra images | Your uploads + captions |
 | Assessment notes | Your notes (end of report) |
 
-**EV × LA “Optimal LA”:** based on a hang-time style proxy from the session’s EV vs launch-angle trend (often near ~80° when EV only falls gently with LA). It is not peak carry distance.
+**EV × LA “Optimal LA”:** based on a hang-time style proxy from the session’s EV vs launch-angle trend (often near ~80° when EV only falls gently with LA). It is not peak carry distance. *(Pending Noah sign-off on this rule vs a different optimal-LA definition.)*
 
 **Previous vs baseline:** if they are the same visit (e.g. first retest), the PDF shows only **Previous** so the comparison isn’t duplicated.
+
+**PDF links:** reports live in a private Google Cloud bucket. Open links from the form (they are time-limited). Opening a raw `storage.googleapis.com` URL in a new tab without a signature will show Access Denied.
 
 ---
 
@@ -126,6 +128,7 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 - Prefer **captions** on photos the first time so you don’t need a cleanup regen.
 - To replace a bad photo: check it under “Images already attached,” add the new file, then Generate PDF.
 - Retest labels (1st / 2nd / 3rd…) are automatic from that player’s history.
+- Use **PDF version history** on the regenerate section to reopen an older draft after a later regenerate.
 
 ---
 
@@ -133,5 +136,6 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 
 - Empty metrics for a tool → confirm the tool checkbox, the assessment **date**, and that data exists for that player that day.
 - Form or PDF errors → note the assessment ID and what you clicked, and contact whoever maintains the HEAT assessment backend.
+- Access Denied on a PDF → reload the assessment in the form and use the new Open link (or ask eng to check signed-URL IAM — `docs/NOAH_OPS.md`).
 
-For engineering setup (database, deploy, API), see [QUICKSTART.md](QUICKSTART.md) and the repo [README](../README.md).
+For engineering setup (database, deploy, API), see [QUICKSTART.md](QUICKSTART.md), [NOAH_OPS.md](NOAH_OPS.md), and the repo [README](../README.md).

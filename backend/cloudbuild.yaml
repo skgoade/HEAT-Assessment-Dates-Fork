@@ -1,0 +1,43 @@
+# Build + deploy heat-assessment-api via Cloud Build SA
+# (avoids needing Artifact Registry Reader on the human deployer).
+#
+# From backend/:
+#   gcloud builds submit --config cloudbuild.yaml .
+
+substitutions:
+  _SERVICE_NAME: heat-assessment-api
+  _REGION: us-east4
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - gcr.io/$PROJECT_ID/${_SERVICE_NAME}
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - gcr.io/$PROJECT_ID/${_SERVICE_NAME}
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image=gcr.io/$PROJECT_ID/${_SERVICE_NAME}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --memory=1Gi
+      - --cpu=1
+      - --max-instances=10
+      - --set-env-vars=DB_PORT=3306,HEAT_GCS_BUCKET=heat-assessment-reports,HEAT_GCS_PREFIX=heat-assessments/,REPORT_LOCAL_DIR=/app/reports,HEAT_GCS_SIGNED_URL_MINUTES=60
+      - --set-secrets=DB_HOST=DB_HOST:latest,DB_USER=DB_USER:latest,DB_PASS=DB_PASS:latest,DB_NAME_PROD=DB_NAME_PROD:latest
+
+images:
+  - gcr.io/$PROJECT_ID/${_SERVICE_NAME}
+
+timeout: 1200s

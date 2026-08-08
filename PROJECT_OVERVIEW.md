@@ -180,12 +180,18 @@ Potential additions for future versions:
 
 1. **Player ID System**: Add unique player IDs to handle name changes
 2. **Assessment Templates**: Pre-defined assessment types (initial, progress, final)
-3. **Photo Upload**: Add before/after video/photo upload capability
-4. **Mobile App**: Native iOS/Android apps for trainers
-5. **Dashboard**: Web dashboard for viewing all assessments
-6. **Notifications**: Alert trainers when swing data is available
-7. **Export**: PDF report generation from assessment data
-8. **Multi-sport**: Expand to track pitching assessments too
+3. **Mobile App**: Native iOS/Android apps for trainers
+4. **Dashboard**: Web dashboard for viewing all assessments
+5. **Notifications**: Alert trainers when swing data is available
+6. **Multi-sport**: Expand to track pitching assessments too
+7. **API auth**: Tighten Cloud Run beyond allow-unauthenticated + signed GCS URLs
+
+### Done / in progress (no longer “future”)
+- PDF report generation (ReportLab) with Blast / HitTrax / VALD day metrics and charts
+- Trainer photo uploads embedded in the PDF
+- Private GCS storage with signed download URLs
+- PDF version history on regenerate
+- Cloud Run service `heat-assessment-api` (see `docs/NOAH_OPS.md`)
 
 ## 📊 Metrics & Monitoring
 

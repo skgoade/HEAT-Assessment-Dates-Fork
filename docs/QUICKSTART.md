@@ -27,32 +27,31 @@ If your table names or column names are different, edit `deployment/schema.sql` 
 ### Step 2: Deploy Backend (2 minutes)
 
 ```bash
-# 1. Update project settings
-# Edit deployment/deploy.sh and set your PROJECT_ID
+# Prefer Cloud Build build+deploy (see docs/NOAH_OPS.md)
+cd backend
+gcloud builds submit --config cloudbuild.yaml .
+cd ..
 
-# 2. Set up secrets
-chmod +x deployment/setup-secrets.sh
-./deployment/setup-secrets.sh
-# Enter your database credentials when prompted
-
-# 3. Deploy
-chmod +x deployment/deploy.sh
-./deployment/deploy.sh
+# Or: bash ./deployment/deploy.sh
 ```
 
-After deployment completes, you'll see your service URL. Copy it!
+After deployment completes, note the service URL (currently
+`https://heat-assessment-api-gyhwqhslwq-uk.a.run.app`).
+
+Also run once on PlayerDev if missing:
+- `deployment/assessment_attachments.sql`
+- `deployment/assessment_report_versions.sql`
 
 ### Step 3: Configure Frontend (1 minute)
 
-```bash
-# Edit frontend/index.html
-# Find this line (around line 301):
-const API_URL = 'https://your-backend-url.run.app/api/hitting-assessment';
+`frontend/index.html` defaults to the live `heat-assessment-api` URL.
+For a local backend, add before the main script:
 
-# Replace with your actual Cloud Run service URL from Step 2
-const API_URL = 'https://hitting-assessment-api-xxxx.run.app/api/hitting-assessment';
+```html
+<script>window.HEAT_API_BASE = 'http://localhost:8080';</script>
 ```
 
+Do **not** point PDF work at legacy `hitting-assessment-api`.
 ### Step 4: Test It!
 
 1. **Open the form**: Open `frontend/index.html` in your browser
@@ -125,7 +124,7 @@ ORDER BY ha.assessment_date;
 
 **Database connection failed?**
 - Verify secrets are set: `gcloud secrets list`
-- Check Cloud Run logs: `gcloud run logs read hitting-assessment-api`
+- Check Cloud Run logs: `gcloud run logs read heat-assessment-api --region us-east4`
 - Test database connection from Cloud Shell
 
 ## 📞 Need Help?

@@ -812,6 +812,13 @@
                     + Add image
                 </button>
             </div>
+            <div class="form-group">
+                <label>PDF version history</label>
+                <p class="section-intro" style="margin: 0 0 12px;">
+                    Each generate keeps prior PDFs. Open any version below (links expire; reload to refresh).
+                </p>
+                <div id="reportVersions" class="existing-attachments"></div>
+            </div>
             <button type="button" class="secondary-btn" id="regenBtn">
                 Generate PDF
             </button>
@@ -820,13 +827,13 @@
     </div>
 
     <script>
-        // Local testing:
-        const API_URL = 'http://localhost:8080/api/hitting-assessment';
-        // Prod: new Cloud Run service heat-assessment-api (not legacy hitting-assessment-api).
-        // After deploy, paste URL from deploy.sh, e.g.:
-        // const API_URL = 'https://heat-assessment-api-XXXX.us-east4.run.app/api/hitting-assessment';
-        // Legacy (do not use for this work):
-        // const API_URL = 'https://hitting-assessment-api-973347833854.us-east4.run.app/api/hitting-assessment';
+        // Production Cloud Run (heat-assessment-api).
+        // For a local backend, set window.HEAT_API_BASE = 'http://localhost:8080' in a
+        // separate script tag before this one (do not put script tags in comments here).
+        const API_BASE = (typeof window.HEAT_API_BASE === 'string' && window.HEAT_API_BASE)
+            ? window.HEAT_API_BASE.replace(/\/$/, '')
+            : 'https://heat-assessment-api-gyhwqhslwq-uk.a.run.app';
+        const API_URL = `${API_BASE}/api/hitting-assessment`;
 
         const MAX_VISUALS = 6;
         const MECHANICS_PHASES = [
@@ -983,6 +990,7 @@
 
         const loadAttachmentsBtn = document.getElementById('loadAttachmentsBtn');
         const existingAttachmentsEl = document.getElementById('existingAttachments');
+        const reportVersionsEl = document.getElementById('reportVersions');
         const regenNotesEl = document.getElementById('regenNotes');
         const regenVideoUrlEl = document.getElementById('regenVideoUrl');
         const regenUsedBlastEl = document.getElementById('regenUsedBlast');
@@ -1312,18 +1320,25 @@
             regenLoadedId = id;
             existingAttachmentsEl.innerHTML =
                 '<div class="helper-text">Loading attached images…</div>';
+            if (reportVersionsEl) {
+                reportVersionsEl.innerHTML =
+                    '<div class="helper-text">Loading PDF versions…</div>';
+            }
             try {
-                const [details, attachments] = await Promise.all([
+                const [details, attachments, versions] = await Promise.all([
                     fetchAssessmentDetails(id),
                     loadExistingAttachments(id),
+                    fetchReportVersions(id).catch(() => []),
                 ]);
                 if (token !== regenAutoLoadToken) return;
                 applyAssessmentDetails(details);
                 renderExistingAttachments(id, attachments);
+                renderReportVersions(versions);
             } catch (err) {
                 if (token !== regenAutoLoadToken) return;
                 regenLoadedId = null;
                 existingAttachmentsEl.innerHTML = '';
+                if (reportVersionsEl) reportVersionsEl.innerHTML = '';
                 throw err;
             }
         }
@@ -1562,20 +1577,61 @@
             }
         }
 
-        function reportLinkHtml(uri) {
+        function reportLinkHtml(uri, { version } = {}) {
             if (!uri) {
                 return '<div style="margin-top:8px">No PDF URI returned — use Regenerate PDF below with the assessment ID.</div>';
             }
+            const label = version != null
+                ? `Open draft PDF (v${version})`
+                : 'Open draft PDF';
             if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('gs://')) {
                 const href = uri.startsWith('gs://')
                     ? `https://console.cloud.google.com/storage/browser/_details/${uri.slice(5)}`
                     : uri;
-                return `<div style="margin-top:8px"><a href="${href}" target="_blank" rel="noopener">Open draft PDF</a></div>`;
+                return `<div style="margin-top:8px"><a href="${href}" target="_blank" rel="noopener">${label}</a></div>`;
             }
             if (uri.startsWith('file://')) {
                 return `<div style="margin-top:8px">Draft PDF saved on server: <code>${uri.replace('file://', '')}</code></div>`;
             }
             return `<div style="margin-top:8px">Report URI: ${uri}</div>`;
+        }
+
+        function renderReportVersions(versions) {
+            if (!reportVersionsEl) return;
+            if (!versions || !versions.length) {
+                reportVersionsEl.innerHTML =
+                    '<div class="helper-text">No PDF versions yet — generate a PDF first.</div>';
+                return;
+            }
+            reportVersionsEl.innerHTML = versions.map((v) => {
+                const href = v.report_url || v.report_uri || v.gcs_uri || '';
+                const when = v.created_at ? ` · ${v.created_at}` : '';
+                const legacy = v.legacy ? ' (legacy)' : '';
+                const open = href
+                    ? `<a href="${href}" target="_blank" rel="noopener">Open v${v.version_num}${legacy}</a>`
+                    : `v${v.version_num}${legacy}`;
+                return `<div class="existing-attachment-row">${open}${when}</div>`;
+            }).join('');
+        }
+
+        async function fetchReportVersions(assessmentId) {
+            const response = await fetch(`${API_URL}/${assessmentId}/report-versions`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not load PDF versions (${response.status})`);
+            }
+            return data.versions || [];
+        }
+
+        async function refreshReportVersions(assessmentId) {
+            if (!assessmentId || !reportVersionsEl) return;
+            try {
+                const versions = await fetchReportVersions(assessmentId);
+                renderReportVersions(versions);
+            } catch (err) {
+                reportVersionsEl.innerHTML =
+                    `<div class="helper-text">Could not load versions: ${err.message}</div>`;
+            }
         }
 
         function showRegenMessage(html, type) {
@@ -1612,7 +1668,11 @@
                     (onSuccessMessage
                         ? onSuccessMessage(data)
                         : `✓ PDF ready for assessment #${data.assessment_id}.`) +
-                    reportLinkHtml(data.report_uri || data.report_gcs_uri);
+                    reportLinkHtml(
+                        data.report_url || data.report_uri || data.report_gcs_uri,
+                        { version: data.report_version }
+                    );
+                refreshReportVersions(data.assessment_id || id);
                 return html;
             } finally {
                 btn.disabled = false;
@@ -1785,7 +1845,8 @@
                     regenLoadedId = String(data.assessment_id);
                     existingAttachmentsEl.innerHTML = '';
 
-                    let reportUri = data.report_uri || data.report_gcs_uri;
+                    let reportUri = data.report_url || data.report_uri || data.report_gcs_uri;
+                    let reportVersion = data.report_version;
                     let visualNote = '';
                     const visuals = collectAllVisualUploads(mechanicsRowsEl, visualRowsEl);
                     if (visuals.length) {
@@ -1793,13 +1854,22 @@
                             const uploadData = await uploadVisuals(data.assessment_id, visuals, {
                                 regenerate: true,
                             });
-                            reportUri = uploadData.report_uri || uploadData.report_gcs_uri || reportUri;
+                            reportUri =
+                                uploadData.report_url ||
+                                uploadData.report_uri ||
+                                uploadData.report_gcs_uri ||
+                                reportUri;
+                            if (uploadData.report_version != null) {
+                                reportVersion = uploadData.report_version;
+                            }
                             visualNote = ` · ${uploadData.uploaded?.length || 0} visual(s) attached`;
                         } catch (uploadErr) {
                             console.error(uploadErr);
                             visualNote = ` · visuals upload failed: ${uploadErr.message}`;
                         }
                         autoLoadRegenAssessment(data.assessment_id, { force: true });
+                    } else {
+                        refreshReportVersions(data.assessment_id);
                     }
 
                     showMessage(
@@ -1807,7 +1877,7 @@
                         (prettyType ? ` (${prettyType})` : '') +
                         `.` +
                         visualNote +
-                        reportLinkHtml(reportUri) +
+                        reportLinkHtml(reportUri, { version: reportVersion }) +
                         `<div class="inline-actions">` +
                         `<button type="button" class="secondary-btn" id="successRegenBtn">Regenerate PDF</button>` +
                         `</div>`,

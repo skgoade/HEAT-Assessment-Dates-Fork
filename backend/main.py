@@ -106,6 +106,7 @@ def serialize_assessment_row(row):
     Make a MySQL row JSON-safe.
 
     mysql.connector returns date/datetime objects; jsonify needs strings.
+    Adds report_url (signed when possible) for browser-openable PDF links.
     """
     if not row:
         return row
@@ -116,6 +117,16 @@ def serialize_assessment_row(row):
         out['created_at'] = out['created_at'].strftime('%Y-%m-%d %H:%M:%S')
     if out.get('updated_at'):
         out['updated_at'] = out['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+    gcs_uri = out.get("report_gcs_uri")
+    if gcs_uri:
+        try:
+            import gcs_upload
+
+            out["report_url"] = gcs_upload.accessible_url(gcs_uri) or gcs_uri
+        except Exception:
+            out["report_url"] = gcs_uri
+    else:
+        out["report_url"] = None
     return out
 
 
@@ -298,21 +309,14 @@ def submit_assessment():
 
                 # M3: draft PDF on submit (local file:// or GCS if HEAT_GCS_BUCKET set)
                 report_uri = None
+                report_meta = None
                 try:
-                    from report_pipeline import generate_draft_report
+                    from report_pipeline import generate_and_store_report
 
                     row = fetch_assessment_by_id(cursor, assessment_id)
-                    report_uri = generate_draft_report(connection, row)
-                    if report_uri:
-                        cursor.execute(
-                            """
-                            UPDATE hitting_assessments
-                            SET report_gcs_uri = %s
-                            WHERE assessment_id = %s
-                            """,
-                            (report_uri, assessment_id),
-                        )
-                        connection.commit()
+                    report_meta = generate_and_store_report(connection, row)
+                    if report_meta:
+                        report_uri = report_meta.get("report_uri")
                 except Exception as report_err:
                     logger.exception(
                         "Assessment %s saved but report failed: %s",
@@ -329,7 +333,9 @@ def submit_assessment():
                     "assessment_type": data['assessmentType'],
                     "previous_assessment_id": previous_id,
                     "report_uri": report_uri,
-                    "report_gcs_uri": report_uri,
+                    "report_url": report_uri,
+                    "report_gcs_uri": (report_meta or {}).get("gcs_uri") or report_uri,
+                    "report_version": (report_meta or {}).get("version_num"),
                 }), 201
         finally:
             # Always close even if validation/insert fails after connect
@@ -470,11 +476,12 @@ def regenerate_hitting_assessment_report(assessment_id):
     Optional JSON may update notes, videoAnalysisUrl, and
     usedBlast/usedHittrax/usedVald before generation. Omitted fields retain
     their stored values.
-    Stores the resulting URI on hitting_assessments.report_gcs_uri.
+    Stores the resulting URI on hitting_assessments.report_gcs_uri and appends
+    a row to assessment_report_versions (prior PDFs are kept).
     Without HEAT_GCS_BUCKET, returns a local file:// path.
     """
     try:
-        from report_pipeline import generate_draft_report
+        from report_pipeline import generate_and_store_report
 
         connection = get_db_connection()
         try:
@@ -522,26 +529,17 @@ def regenerate_hitting_assessment_report(assessment_id):
                     connection.commit()
                     row = fetch_assessment_by_id(cursor, assessment_id)
 
-            uri = generate_draft_report(connection, row)
-            if not uri:
+            meta = generate_and_store_report(connection, row)
+            if not meta or not meta.get("report_uri"):
                 return jsonify({"error": "Report generation returned no URI"}), 500
-
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE hitting_assessments
-                    SET report_gcs_uri = %s
-                    WHERE assessment_id = %s
-                    """,
-                    (uri, assessment_id),
-                )
-                connection.commit()
 
             return jsonify({
                 "assessment_id": assessment_id,
                 "status": "ok",
-                "report_uri": uri,
-                "report_gcs_uri": uri,
+                "report_uri": meta.get("report_uri"),
+                "report_url": meta.get("report_url"),
+                "report_gcs_uri": meta.get("gcs_uri"),
+                "report_version": meta.get("version_num"),
             }), 200
         finally:
             connection.close()
@@ -550,22 +548,44 @@ def regenerate_hitting_assessment_report(assessment_id):
         return jsonify({"error": str(e)}), 500
 
 
-def _regenerate_and_store(connection, row, assessment_id, generate_draft_report):
-    """Rebuild the PDF and record its URI; never raises."""
+@app.route(
+    "/api/hitting-assessment/<int:assessment_id>/report-versions",
+    methods=["GET", "OPTIONS"],
+)
+def list_hitting_assessment_report_versions(assessment_id):
+    """List PDF versions for an assessment (newest first), with signed URLs."""
+    if request.method == "OPTIONS":
+        return "", 204
     try:
-        report_uri = generate_draft_report(connection, row)
-        if report_uri:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE hitting_assessments
-                    SET report_gcs_uri = %s
-                    WHERE assessment_id = %s
-                    """,
-                    (report_uri, assessment_id),
-                )
-                connection.commit()
-        return report_uri
+        import report_versions
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+            versions = report_versions.list_versions(connection, assessment_id)
+            return jsonify({
+                "assessment_id": assessment_id,
+                "versions": versions,
+            }), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("Error listing report versions for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
+
+
+def _regenerate_and_store(connection, row, assessment_id, generate_draft_report=None):
+    """Rebuild the PDF and record its URI + version; never raises."""
+    try:
+        from report_pipeline import generate_and_store_report
+
+        meta = generate_and_store_report(connection, row)
+        if not meta:
+            return None
+        return meta.get("report_uri")
     except Exception as report_err:
         logger.exception(
             "Report regen failed for %s: %s", assessment_id, report_err
@@ -598,7 +618,6 @@ def assessment_attachments(assessment_id):
 
     try:
         import attachments as attachments_mod
-        from report_pipeline import generate_draft_report
 
         connection = get_db_connection()
         try:
@@ -637,7 +656,7 @@ def assessment_attachments(assessment_id):
                 report_uri = None
                 if request.args.get("regenerate", "1") not in ("0", "false", "False"):
                     report_uri = _regenerate_and_store(
-                        connection, row, assessment_id, generate_draft_report
+                        connection, row, assessment_id
                     )
                 return jsonify({
                     "success": True,
@@ -722,7 +741,7 @@ def assessment_attachments(assessment_id):
             regenerate = request.form.get("regenerate", "1") not in ("0", "false", "False")
             if regenerate and saved:
                 report_uri = _regenerate_and_store(
-                    connection, row, assessment_id, generate_draft_report
+                    connection, row, assessment_id
                 )
 
             return jsonify({

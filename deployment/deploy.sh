@@ -2,6 +2,9 @@
 
 # HEAT Assessment API — new Cloud Run service (separate from legacy hitting-assessment-api)
 # Deploys from this repo so PDF/report work does not overwrite the old static-dates API.
+#
+# Prefer Cloud Build build+deploy (backend/cloudbuild.yaml) so the Build SA pulls the image.
+# See docs/NOAH_OPS.md for IAM, SQL migrations, and signed-URL SA setup.
 
 set -e  # Exit on error
 
@@ -38,24 +41,11 @@ gcloud services enable cloudbuild.googleapis.com
 gcloud services enable run.googleapis.com
 gcloud services enable secretmanager.googleapis.com
 
-# Build the container image
-echo "Building container image..."
+# Build + deploy via Cloud Build (Build SA pushes image and runs gcloud run deploy)
+echo "Submitting Cloud Build (build + deploy)..."
 cd backend
-gcloud builds submit --tag ${IMAGE_NAME}
+gcloud builds submit --config cloudbuild.yaml .
 cd ..
-
-# Deploy to Cloud Run (creates a NEW service if it does not exist)
-echo "Deploying to Cloud Run as ${SERVICE_NAME}..."
-gcloud run deploy ${SERVICE_NAME} \
-    --image ${IMAGE_NAME} \
-    --platform managed \
-    --region ${REGION} \
-    --allow-unauthenticated \
-    --memory 1Gi \
-    --cpu 1 \
-    --max-instances 10 \
-    --set-env-vars "DB_PORT=3306,HEAT_GCS_BUCKET=heat-assessment-reports,HEAT_GCS_PREFIX=heat-assessments/,REPORT_LOCAL_DIR=/app/reports" \
-    --set-secrets "DB_HOST=DB_HOST:latest,DB_USER=DB_USER:latest,DB_PASS=DB_PASS:latest,DB_NAME_PROD=DB_NAME_PROD:latest"
 
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --platform managed --region ${REGION} --format 'value(status.url)')
@@ -65,8 +55,11 @@ echo "Deployment complete!"
 echo "Service URL: ${SERVICE_URL}"
 echo ""
 echo "Next steps:"
-echo "1. Point frontend API_URL at: ${SERVICE_URL}/api/hitting-assessment"
+echo "1. In frontend/index.html set: window.HEAT_API_BASE = '${SERVICE_URL}'"
 echo "2. Health check: curl ${SERVICE_URL}/health"
-echo "3. Publish frontend/index.html to the form bucket"
-echo "4. Leave legacy hitting-assessment-api running until you decommission it"
+echo "3. Run SQL if needed: deployment/assessment_attachments.sql"
+echo "   and deployment/assessment_report_versions.sql"
+echo "4. Publish frontend/index.html to the form bucket"
+echo "5. Leave legacy hitting-assessment-api running until you decommission it"
+echo "6. See docs/NOAH_OPS.md for GCS signed-URL IAM on the Cloud Run SA"
 echo ""

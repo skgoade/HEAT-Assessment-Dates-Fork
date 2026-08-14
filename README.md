@@ -6,6 +6,8 @@ A comprehensive system for tracking hitting assessments and automatically linkin
 
 **[Trainer Guide](docs/TRAINER_GUIDE.md)** — how to submit assessments, upload mechanics photos, regenerate PDFs, and what shows up in the report.
 
+**[Local testing](docs/LOCAL_TESTING.md)** — run the API + form on your machine against PlayerDev.
+
 ## Overview
 
 This system allows hitting trainers to input assessment data that is automatically linked with swing data from Blast Motion and HitTrax devices. The database views enable powerful automated reporting that compares:

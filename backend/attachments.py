@@ -20,8 +20,9 @@ ALLOWED_CONTENT_TYPES = {
     "image/gif": ".gif",
 }
 MAX_BYTES = 4 * 1024 * 1024  # 4 MB per file
-# 5 mechanics phases + several optional extras
-MAX_FILES = 12
+# Up to 3 images × 5 mechanics phases + several optional extras
+MAX_FILES = 24
+MAX_PHOTOS_PER_MECHANICS_PHASE = 3
 
 
 def _slug(name: str) -> str:
@@ -127,6 +128,31 @@ def delete_attachments(
         )
         conn.commit()
     return deleted
+
+
+def reorder_attachments(conn, assessment_id: int, ordered_ids: list[int]) -> list[int]:
+    """
+    Persist a new global sort_order from a permutation of attachment ids.
+
+    Returns the ids in the applied order.
+    """
+    rows = list_attachments(conn, assessment_id)
+    existing = [int(r["attachment_id"]) for r in rows]
+    wanted = [int(i) for i in ordered_ids]
+    if sorted(wanted) != sorted(existing):
+        raise ValueError("ordered ids must include every attachment exactly once")
+    with conn.cursor() as cur:
+        for idx, aid in enumerate(wanted):
+            cur.execute(
+                """
+                UPDATE assessment_attachments
+                SET sort_order = %s
+                WHERE assessment_id = %s AND attachment_id = %s
+                """,
+                (idx, assessment_id, aid),
+            )
+        conn.commit()
+    return wanted
 
 
 def store_image_bytes(

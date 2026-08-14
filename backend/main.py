@@ -12,10 +12,12 @@ Deployed on Google Cloud Run; MySQL credentials come from environment variables
 
 import os
 import logging
+import json
+import re
 from datetime import datetime
 from typing import Optional
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import mysql.connector
 
@@ -23,13 +25,13 @@ from db import get_db_connection
 
 app = Flask(__name__)
 # Trainer image uploads (multipart) — several files up to ~4 MB each
-app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # Allow the GCS-hosted HTML form (and local file:// / other origins) to call /api/*.
 CORS(app, resources={
     r"/api/*": {
         "origins": ["*"],
-        "methods": ["POST", "GET", "DELETE", "OPTIONS"],
+        "methods": ["POST", "GET", "DELETE", "PUT", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
@@ -56,9 +58,18 @@ ASSESSMENT_SELECT_COLUMNS = """
     assessment_type,
     previous_assessment_id,
     report_gcs_uri,
+    mechanics_phase_notes,
     created_at,
     updated_at
 """
+
+MECHANICS_PHASE_SLOTS = (
+    "load_phase",
+    "load_position",
+    "stride_phase",
+    "launch_position",
+    "impact",
+)
 
 
 def _parse_optional_int(value, field_name):
@@ -101,6 +112,33 @@ def _normalize_video_url(value) -> Optional[str]:
     return None
 
 
+def _normalize_mechanics_phase_notes(value):
+    """
+    Parse mechanicsPhaseNotes from JSON body into a cleaned dict or None.
+
+    Returns (ok, value_or_None, error_message).
+    Keys must be known swing-phase slots; empty notes are dropped.
+    """
+    if value is None or value == "":
+        return True, None, None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return False, None, "mechanicsPhaseNotes must be a JSON object"
+    if not isinstance(value, dict):
+        return False, None, "mechanicsPhaseNotes must be an object"
+    cleaned = {}
+    for key, raw in value.items():
+        slot = str(key).strip()
+        if slot not in MECHANICS_PHASE_SLOTS:
+            return False, None, f"Unknown mechanics phase slot: {slot}"
+        text = str(raw or "").strip()
+        if text:
+            cleaned[slot] = text[:4000]
+    return True, (cleaned or None), None
+
+
 def serialize_assessment_row(row):
     """
     Make a MySQL row JSON-safe.
@@ -117,6 +155,15 @@ def serialize_assessment_row(row):
         out['created_at'] = out['created_at'].strftime('%Y-%m-%d %H:%M:%S')
     if out.get('updated_at'):
         out['updated_at'] = out['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+    phase_notes = out.get("mechanics_phase_notes")
+    if isinstance(phase_notes, str):
+        try:
+            phase_notes = json.loads(phase_notes)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            phase_notes = None
+    if phase_notes is not None and not isinstance(phase_notes, dict):
+        phase_notes = None
+    out["mechanics_phase_notes"] = phase_notes or None
     gcs_uri = out.get("report_gcs_uri")
     if gcs_uri:
         try:
@@ -186,6 +233,13 @@ def validate_assessment_data(data):
         data['_videoAnalysisUrl'] = video_url
     else:
         data['_videoAnalysisUrl'] = None
+
+    notes_ok, phase_notes, notes_err = _normalize_mechanics_phase_notes(
+        data.get("mechanicsPhaseNotes")
+    )
+    if not notes_ok:
+        return False, notes_err
+    data["_mechanicsPhaseNotes"] = phase_notes
     return True, None
 
 
@@ -276,13 +330,18 @@ def submit_assessment():
                     return jsonify({"error": peers_err}), 400
 
                 # Baseline is not stored — metrics resolve earliest initial at read time.
+                phase_notes = data.get("_mechanicsPhaseNotes")
+                phase_notes_json = (
+                    json.dumps(phase_notes) if phase_notes else None
+                )
                 sql = """
                     INSERT INTO hitting_assessments
                     (assessment_date, player_name, trainer_name, notes,
                      video_analysis_url,
                      used_blast, used_hittrax, used_vald,
-                     assessment_type, previous_assessment_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     assessment_type, previous_assessment_id,
+                     mechanics_phase_notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 values = (
                     data['assessmentDate'],
@@ -295,6 +354,7 @@ def submit_assessment():
                     data['_usedVald'],
                     data['assessmentType'],
                     previous_id,
+                    phase_notes_json,
                 )
                 cursor.execute(sql, values)
                 connection.commit()
@@ -516,6 +576,16 @@ def regenerate_hitting_assessment_report(assessment_id):
                     if json_key in data:
                         updates.append(f"{column} = %s")
                         values.append(_parse_bool(data[json_key]))
+                if "mechanicsPhaseNotes" in data:
+                    notes_ok, phase_notes, notes_err = _normalize_mechanics_phase_notes(
+                        data.get("mechanicsPhaseNotes")
+                    )
+                    if not notes_ok:
+                        return jsonify({"error": notes_err}), 400
+                    updates.append("mechanics_phase_notes = %s")
+                    values.append(
+                        json.dumps(phase_notes) if phase_notes else None
+                    )
                 if updates:
                     values.append(assessment_id)
                     cursor.execute(
@@ -577,6 +647,91 @@ def list_hitting_assessment_report_versions(assessment_id):
         return jsonify({"error": str(e)}), 500
 
 
+def _download_filename(row: dict, version_num=None) -> str:
+    player = (row.get("player_name") or "player").strip()
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", player).strip("_").lower() or "player"
+    adate = row.get("assessment_date")
+    if hasattr(adate, "strftime"):
+        date_part = adate.strftime("%Y-%m-%d")
+    else:
+        date_part = str(adate or "unknown")[:10]
+    aid = row.get("assessment_id")
+    if version_num is not None:
+        return f"{slug}_{date_part}_{aid}_v{version_num}.pdf"
+    return f"{slug}_{date_part}_{aid}.pdf"
+
+
+@app.route(
+    "/api/hitting-assessment/<int:assessment_id>/report/download",
+    methods=["GET", "OPTIONS"],
+)
+def download_hitting_assessment_report(assessment_id):
+    """
+    Stream the PDF as an attachment so the browser downloads it.
+
+    Optional ?version=N selects a historical version; otherwise latest
+    hitting_assessments.report_gcs_uri is used.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    try:
+        import gcs_upload
+        import report_versions
+
+        version_raw = request.args.get("version")
+        version_num = None
+        if version_raw not in (None, ""):
+            try:
+                version_num = int(version_raw)
+            except (TypeError, ValueError):
+                return jsonify({"error": "version must be an integer"}), 400
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+
+            uri = None
+            if version_num is not None:
+                versions = report_versions.list_versions(connection, assessment_id)
+                match = next(
+                    (v for v in versions if int(v.get("version_num") or 0) == version_num),
+                    None,
+                )
+                if not match:
+                    return jsonify({"error": f"Version {version_num} not found"}), 404
+                uri = match.get("gcs_uri")
+            else:
+                uri = row.get("report_gcs_uri")
+
+            if not uri:
+                return jsonify({"error": "No PDF available for this assessment"}), 404
+
+            data = gcs_upload.download_bytes(uri)
+            if data is None:
+                return jsonify({"error": "Could not read PDF"}), 404
+
+            filename = _download_filename(row, version_num)
+            return Response(
+                data,
+                mimetype="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Length": str(len(data)),
+                    "Cache-Control": "no-store",
+                },
+            )
+        finally:
+            connection.close()
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        logger.exception("Error downloading report for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
+
+
 def _regenerate_and_store(connection, row, assessment_id, generate_draft_report=None):
     """Rebuild the PDF and record its URI + version; never raises."""
     try:
@@ -591,6 +746,56 @@ def _regenerate_and_store(connection, row, assessment_id, generate_draft_report=
             "Report regen failed for %s: %s", assessment_id, report_err
         )
         return None
+
+
+@app.route(
+    "/api/hitting-assessment/<int:assessment_id>/attachments/order",
+    methods=["PUT", "OPTIONS"],
+)
+def reorder_assessment_attachments(assessment_id):
+    """
+    Set PDF order for already-attached images.
+
+    Body: { "ids": [12, 9, 15] } — permutation of every attachment id
+    on this assessment. Mechanics photos within a phase follow this
+    relative order on the PDF card.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    try:
+        import attachments as attachments_mod
+
+        data = request.get_json(silent=True) or {}
+        raw_ids = data.get("ids")
+        if not isinstance(raw_ids, list) or not raw_ids:
+            return jsonify({"error": "ids must be a non-empty array"}), 400
+        try:
+            ordered_ids = [int(i) for i in raw_ids]
+        except (TypeError, ValueError):
+            return jsonify({"error": "ids must be integers"}), 400
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+            try:
+                applied = attachments_mod.reorder_attachments(
+                    connection, assessment_id, ordered_ids
+                )
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+            return jsonify({
+                "success": True,
+                "assessment_id": assessment_id,
+                "ids": applied,
+            }), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("Reorder attachments failed for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route(

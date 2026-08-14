@@ -153,6 +153,35 @@ def upload_pdf(local_path: str, object_name: Optional[str] = None) -> Optional[s
     return _https_url(bucket_name, object_name)
 
 
+def download_bytes(uri: str) -> Optional[bytes]:
+    """
+    Download object bytes for a gs:// or https://storage.googleapis.com/ URI,
+    or read a local file:// path. Returns None if the URI is empty/unsupported.
+    """
+    uri = (uri or "").strip()
+    if not uri:
+        return None
+
+    if uri.startswith("file://"):
+        path = Path(uri[len("file://"):])
+        if not path.is_file():
+            raise FileNotFoundError(f"Local report not found: {path}")
+        return path.read_bytes()
+
+    bucket_name, object_name = parse_gcs_uri(uri)
+    if not bucket_name or not object_name:
+        raise ValueError(f"Unsupported report URI: {uri}")
+
+    try:
+        from google.cloud import storage
+    except ImportError as e:
+        raise RuntimeError("google-cloud-storage is not installed") from e
+
+    client = storage.Client()
+    blob = client.bucket(bucket_name).blob(object_name)
+    return blob.download_as_bytes()
+
+
 def delete_object(uri: str) -> bool:
     """Best-effort delete of a previously uploaded object by https:// or gs:// URI."""
     uri = (uri or "").strip()

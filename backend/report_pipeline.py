@@ -39,6 +39,19 @@ def generate_draft_report(
         logger.exception("Failed loading trainer visuals for PDF")
         bundle["trainer_visuals"] = []
 
+    # Phase notes may already be a dict (from serialize) or a JSON string from MySQL.
+    phase_notes = assessment_row.get("mechanics_phase_notes")
+    if isinstance(phase_notes, str):
+        import json
+
+        try:
+            phase_notes = json.loads(phase_notes)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            phase_notes = None
+    if not isinstance(phase_notes, dict):
+        phase_notes = {}
+    bundle["mechanics_phase_notes"] = phase_notes
+
     local_path = report_pdf.build_pdf(bundle)
 
     player = assessment_row["player_name"]

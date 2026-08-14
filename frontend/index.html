@@ -245,6 +245,65 @@
             flex: 0 0 auto;
         }
 
+        .mechanics-phase-card {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 14px 14px 12px;
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.18);
+        }
+
+        .mechanics-phase-header {
+            font-weight: 700;
+            color: #7fc4ff;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .mechanics-phase-notes {
+            width: 100%;
+            min-height: 56px;
+            margin: 0 0 10px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        .mechanics-phase-files {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .mechanics-photo-row {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .mechanics-photo-row .mechanics-photo-order {
+            font-weight: 700;
+            color: #7fc4ff;
+            min-width: 1.75rem;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            padding-top: 8px;
+        }
+
+        .mechanics-photo-row .visual-row-fields {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .mechanics-add-photo {
+            margin-top: 0;
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
         .visual-row-actions {
             display: flex;
             flex-direction: column;
@@ -292,6 +351,34 @@
 
         .existing-attachments {
             margin-top: 12px;
+        }
+
+        .existing-attachment-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 6px 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.92rem;
+            color: rgba(255, 255, 255, 0.78);
+        }
+
+        .existing-attachment-row:last-child {
+            border-bottom: none;
+        }
+
+        a.report-download-btn {
+            color: #fcba39;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            cursor: pointer;
+        }
+
+        a.report-download-btn[aria-busy="true"] {
+            opacity: 0.65;
+            pointer-events: none;
         }
 
         .tool-options {
@@ -348,6 +435,17 @@
         .attachment-row .attachment-caption.missing {
             color: #ff8a8a;
             font-style: italic;
+        }
+
+        .attachment-group-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #7fc4ff;
+            margin: 12px 0 6px;
+        }
+
+        .attachment-group-label:first-child {
+            margin-top: 0;
         }
 
         .divider {
@@ -563,10 +661,10 @@
                 <label for="playerName">
                     Player Name<span class="required">*</span>
                 </label>
-                <input
-                    type="text"
-                    id="playerName"
-                    name="playerName"
+                <input 
+                    type="text" 
+                    id="playerName" 
+                    name="playerName" 
                     required
                     placeholder="Enter player name"
                     list="playerNames"
@@ -596,10 +694,10 @@
                 <label for="assessmentDate">
                     Assessment Date<span class="required">*</span>
                 </label>
-                <input
-                    type="date"
-                    id="assessmentDate"
-                    name="assessmentDate"
+                <input 
+                    type="date" 
+                    id="assessmentDate" 
+                    name="assessmentDate" 
                     required
                 >
                 <div class="helper-text">Date when the assessment was conducted</div>
@@ -609,10 +707,10 @@
                 <label for="trainerName">
                     Trainer Name
                 </label>
-                <input
-                    type="text"
-                    id="trainerName"
-                    name="trainerName"
+                <input 
+                    type="text" 
+                    id="trainerName" 
+                    name="trainerName" 
                     placeholder="Enter trainer name"
                     list="trainerNames"
                     autocomplete="off"
@@ -653,9 +751,9 @@
                 <label for="notes">
                     Assessment Notes
                 </label>
-                <textarea
-                    id="notes"
-                    name="notes"
+                <textarea 
+                    id="notes" 
+                    name="notes" 
                     placeholder="Enter any observations, goals, or specific focuses for this assessment..."
                 ></textarea>
                 <div class="helper-text">
@@ -667,10 +765,11 @@
             </div>
 
             <div class="form-group">
-                <label>Mechanics photos (optional)</label>
+                <label>Mechanics phase cards (optional)</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
-                    Still frames for Load Phase, Load Position, Stride Phase, Launch Position, and Impact
-                    (as in the hand-built assessment docs). PNG/JPEG/WebP, up to 4&nbsp;MB each.
+                    One card per swing phase (Load Phase → Impact). Add notes and up to
+                    3 photos per phase (Load often needs two). Use ↑ ↓ to set photo order
+                    in the PDF (top = first). PNG/JPEG/WebP, up to 4&nbsp;MB each.
                 </p>
                 <div id="mechanicsRows"></div>
             </div>
@@ -786,8 +885,8 @@
                 <label>Images already attached</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
                     Notes, tools, and images load automatically once an assessment is
-                    selected above. Check any image to remove duplicates or ones uploaded
-                    without captions.
+                    selected above. Check any image to remove it. Use ↑ ↓ within a phase
+                    to change photo order on the PDF card.
                 </p>
                 <button type="button" class="secondary-btn" id="loadAttachmentsBtn">
                     Reload from saved assessment
@@ -795,9 +894,10 @@
                 <div id="existingAttachments" class="existing-attachments"></div>
             </div>
             <div class="form-group">
-                <label>Mechanics photos (optional)</label>
+                <label>Mechanics phase cards (optional)</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
-                    Load Phase → Impact stills for this assessment.
+                    Notes + photos per phase (up to 3 photos each). Use ↑ ↓ for PDF order
+                    among new photos in a phase.
                 </p>
                 <div id="regenMechanicsRows"></div>
             </div>
@@ -815,7 +915,7 @@
             <div class="form-group">
                 <label>PDF version history</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
-                    Each generate keeps prior PDFs. Open any version below (links expire; reload to refresh).
+                    Each generate keeps prior PDFs. Download any version from the list below.
                 </p>
                 <div id="reportVersions" class="existing-attachments"></div>
             </div>
@@ -826,16 +926,22 @@
         </section>
     </div>
 
+    <!-- LOCAL TESTING: uncomment the next line, then open this file in a browser.
+    <script>window.HEAT_API_BASE = 'http://localhost:8080';</script>
+    -->
+    <script>window.HEAT_API_BASE = 'http://localhost:8080';</script>
+
     <script>
         // Production Cloud Run (heat-assessment-api).
-        // For a local backend, set window.HEAT_API_BASE = 'http://localhost:8080' in a
-        // separate script tag before this one (do not put script tags in comments here).
+        // For a local backend, uncomment the LOCAL TESTING script tag above this block
+        // (or set window.HEAT_API_BASE before this script runs).
         const API_BASE = (typeof window.HEAT_API_BASE === 'string' && window.HEAT_API_BASE)
             ? window.HEAT_API_BASE.replace(/\/$/, '')
             : 'https://heat-assessment-api-gyhwqhslwq-uk.a.run.app';
         const API_URL = `${API_BASE}/api/hitting-assessment`;
 
         const MAX_VISUALS = 6;
+        const MAX_PHOTOS_PER_PHASE = 3;
         const MECHANICS_PHASES = [
             { slot: 'load_phase', label: 'Load Phase' },
             { slot: 'load_position', label: 'Load Position' },
@@ -849,6 +955,7 @@
         const regenAddVisualBtn = document.getElementById('regenAddVisualBtn');
         const mechanicsRowsEl = document.getElementById('mechanicsRows');
         const regenMechanicsRowsEl = document.getElementById('regenMechanicsRows');
+        let regenPhaseNotesDirty = false;
 
         function refreshVisualOrderLabels(container) {
             container.querySelectorAll('.visual-row').forEach((row, idx) => {
@@ -871,20 +978,105 @@
             refreshVisualOrderLabels(container);
         }
 
-        function initMechanicsRows(container) {
+        function refreshMechanicsPhotoOrder(card) {
+            const filesEl = card.querySelector('.mechanics-phase-files');
+            if (!filesEl) return;
+            filesEl.querySelectorAll('.mechanics-photo-row').forEach((row, idx) => {
+                const badge = row.querySelector('.mechanics-photo-order');
+                if (badge) badge.textContent = `#${idx + 1}`;
+            });
+        }
+
+        function refreshMechanicsAddPhotoBtn(card) {
+            const filesEl = card.querySelector('.mechanics-phase-files');
+            const addBtn = card.querySelector('.mechanics-add-photo');
+            if (!filesEl || !addBtn) return;
+            const count = filesEl.querySelectorAll('.mechanics-photo-row').length;
+            addBtn.disabled = count >= MAX_PHOTOS_PER_PHASE;
+            addBtn.textContent = count >= MAX_PHOTOS_PER_PHASE
+                ? `Max ${MAX_PHOTOS_PER_PHASE} photos`
+                : '+ Add photo';
+            refreshMechanicsPhotoOrder(card);
+        }
+
+        function moveMechanicsPhotoRow(row, direction) {
+            const container = row.parentElement;
+            if (direction < 0 && row.previousElementSibling) {
+                container.insertBefore(row, row.previousElementSibling);
+            } else if (direction > 0 && row.nextElementSibling) {
+                container.insertBefore(row.nextElementSibling, row);
+            }
+            const card = row.closest('.mechanics-phase-card');
+            if (card) refreshMechanicsPhotoOrder(card);
+        }
+
+        function addMechanicsPhotoRow(card) {
+            const filesEl = card.querySelector('.mechanics-phase-files');
+            if (!filesEl) return;
+            if (filesEl.querySelectorAll('.mechanics-photo-row').length >= MAX_PHOTOS_PER_PHASE) {
+                refreshMechanicsAddPhotoBtn(card);
+                return;
+            }
+            const row = document.createElement('div');
+            row.className = 'mechanics-photo-row';
+            row.innerHTML = `
+                <span class="mechanics-photo-order">#1</span>
+                <div class="visual-row-fields">
+                    <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
+                    <input type="text" class="visual-caption" placeholder="Caption (optional)">
+                </div>
+                <div class="visual-row-actions">
+                    <button type="button" class="icon-btn mechanics-photo-up" title="Move up" aria-label="Move up">↑</button>
+                    <button type="button" class="icon-btn mechanics-photo-down" title="Move down" aria-label="Move down">↓</button>
+                    <button type="button" class="icon-btn mechanics-photo-remove" title="Remove photo" aria-label="Remove photo">×</button>
+                </div>
+            `;
+            row.querySelector('.mechanics-photo-up').addEventListener('click', () => {
+                moveMechanicsPhotoRow(row, -1);
+            });
+            row.querySelector('.mechanics-photo-down').addEventListener('click', () => {
+                moveMechanicsPhotoRow(row, 1);
+            });
+            row.querySelector('.mechanics-photo-remove').addEventListener('click', () => {
+                const remaining = filesEl.querySelectorAll('.mechanics-photo-row').length;
+                if (remaining <= 1) {
+                    row.querySelector('.visual-file').value = '';
+                    row.querySelector('.visual-caption').value = '';
+                    return;
+                }
+                row.remove();
+                refreshMechanicsAddPhotoBtn(card);
+            });
+            filesEl.appendChild(row);
+            refreshMechanicsAddPhotoBtn(card);
+        }
+
+        function initMechanicsRows(container, notesBySlot = {}) {
             container.innerHTML = '';
+            const notes = notesBySlot && typeof notesBySlot === 'object' ? notesBySlot : {};
             MECHANICS_PHASES.forEach((phase) => {
-                const row = document.createElement('div');
-                row.className = 'visual-row mechanics-row';
-                row.dataset.slot = phase.slot;
-                row.innerHTML = `
-                    <span class="mechanics-label">${phase.label}</span>
-                    <div class="visual-row-fields">
-                        <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
-                        <input type="text" class="visual-caption" placeholder="Caption (optional)">
-                    </div>
+                const card = document.createElement('div');
+                card.className = 'mechanics-phase-card';
+                card.dataset.slot = phase.slot;
+                card.innerHTML = `
+                    <div class="mechanics-phase-header">${phase.label}</div>
+                    <textarea class="mechanics-phase-notes" rows="2"
+                        placeholder="Notes for this phase (optional)"></textarea>
+                    <div class="mechanics-phase-files"></div>
+                    <button type="button" class="secondary-btn mechanics-add-photo">+ Add photo</button>
                 `;
-                container.appendChild(row);
+                const notesEl = card.querySelector('.mechanics-phase-notes');
+                notesEl.value = notes[phase.slot] || '';
+                notesEl.addEventListener('input', () => {
+                    if (container === regenMechanicsRowsEl) {
+                        regenPhaseNotesDirty = true;
+                    }
+                });
+                card.querySelector('.mechanics-add-photo').addEventListener('click', () => {
+                    addMechanicsPhotoRow(card);
+                });
+                container.appendChild(card);
+                addMechanicsPhotoRow(card);
             });
         }
 
@@ -930,16 +1122,29 @@
         addVisualRow(visualRowsEl, addVisualBtn);
         addVisualRow(regenVisualRowsEl, regenAddVisualBtn);
 
+        function collectMechanicsPhaseNotes(container) {
+            const notes = {};
+            container.querySelectorAll('.mechanics-phase-card').forEach((card) => {
+                const slot = card.dataset.slot || '';
+                const text = (card.querySelector('.mechanics-phase-notes')?.value || '').trim();
+                if (slot && text) notes[slot] = text;
+            });
+            return notes;
+        }
+
         function collectMechanicsUploads(container) {
             const items = [];
-            container.querySelectorAll('.mechanics-row').forEach((row) => {
-                const fileInput = row.querySelector('.visual-file');
-                const file = fileInput && fileInput.files && fileInput.files[0];
-                if (!file) return;
-                items.push({
-                    file,
-                    caption: (row.querySelector('.visual-caption').value || '').trim(),
-                    slot: row.dataset.slot || 'other',
+            container.querySelectorAll('.mechanics-phase-card').forEach((card) => {
+                const slot = card.dataset.slot || 'other';
+                card.querySelectorAll('.mechanics-photo-row').forEach((row) => {
+                    const fileInput = row.querySelector('.visual-file');
+                    const file = fileInput && fileInput.files && fileInput.files[0];
+                    if (!file) return;
+                    items.push({
+                        file,
+                        caption: (row.querySelector('.visual-caption').value || '').trim(),
+                        slot,
+                    });
                 });
             });
             return items;
@@ -1007,6 +1212,7 @@
         let regenNotesDirty = false;
         let regenVideoDirty = false;
         let regenToolsDirty = false;
+        let regenAttachmentOrderDirty = false;
         let regenPlayerLookupToken = 0;
 
         regenNotesEl.addEventListener('input', () => { regenNotesDirty = true; });
@@ -1046,9 +1252,11 @@
             regenUsedHittraxEl.checked =
                 data.used_hittrax !== 0 && data.used_hittrax !== false;
             regenUsedValdEl.checked = data.used_vald !== 0 && data.used_vald !== false;
+            initMechanicsRows(regenMechanicsRowsEl, data.mechanics_phase_notes || {});
             regenNotesDirty = false;
             regenVideoDirty = false;
             regenToolsDirty = false;
+            regenPhaseNotesDirty = false;
         }
 
         async function loadAssessmentDetails(assessmentId) {
@@ -1057,18 +1265,86 @@
             return data;
         }
 
+        function collectExistingAttachmentOrder() {
+            return Array.from(
+                existingAttachmentsEl.querySelectorAll('.attachment-row')
+            ).map((row) => Number(row.dataset.attachmentId)).filter(Boolean);
+        }
+
+        function moveExistingAttachmentRow(row, direction) {
+            const group = row.parentElement;
+            if (!group || !group.classList.contains('attachment-group')) return;
+            if (direction < 0 && row.previousElementSibling) {
+                group.insertBefore(row, row.previousElementSibling);
+            } else if (direction > 0 && row.nextElementSibling) {
+                group.insertBefore(row.nextElementSibling, row);
+            }
+            regenAttachmentOrderDirty = true;
+            refreshExistingAttachmentOrderLabels();
+        }
+
+        function refreshExistingAttachmentOrderLabels() {
+            existingAttachmentsEl.querySelectorAll('.attachment-group').forEach((group) => {
+                group.querySelectorAll('.attachment-row').forEach((row, idx) => {
+                    const badge = row.querySelector('.mechanics-photo-order');
+                    if (badge) badge.textContent = `#${idx + 1}`;
+                });
+            });
+        }
+
+        async function saveExistingAttachmentOrder(assessmentId) {
+            const ids = collectExistingAttachmentOrder();
+            if (!ids.length) return null;
+            const response = await fetch(`${API_URL}/${assessmentId}/attachments/order`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not save photo order (${response.status})`);
+            }
+            return data;
+        }
+
         function renderExistingAttachments(assessmentId, items) {
             existingAttachmentsEl.innerHTML = '';
+            regenAttachmentOrderDirty = false;
             if (!items.length) {
                 existingAttachmentsEl.innerHTML =
                     '<div class="helper-text">No images attached to this assessment yet.</div>';
                 return;
             }
+
+            const phaseSlots = MECHANICS_PHASES.map((p) => p.slot);
+            const bySlot = {};
+            const extras = [];
             items.forEach((item) => {
+                const slot = item.slot || 'other';
+                if (phaseSlots.includes(slot)) {
+                    (bySlot[slot] ||= []).push(item);
+                } else {
+                    extras.push(item);
+                }
+            });
+
+            function appendAttachmentRow(parent, item, { reorderable }) {
                 const row = document.createElement('div');
                 row.className = 'attachment-row';
+                row.dataset.attachmentId = String(item.attachment_id);
+                row.dataset.slot = item.slot || 'other';
                 const caption = (item.caption || '').trim();
+                const orderBadge = reorderable
+                    ? '<span class="mechanics-photo-order">#1</span>'
+                    : '';
+                const actions = reorderable
+                    ? `<div class="visual-row-actions">
+                            <button type="button" class="icon-btn attachment-up" title="Move up" aria-label="Move up">↑</button>
+                            <button type="button" class="icon-btn attachment-down" title="Move down" aria-label="Move down">↓</button>
+                       </div>`
+                    : '';
                 row.innerHTML = `
+                    ${orderBadge}
                     <input type="checkbox" class="attachment-select" value="${item.attachment_id}">
                     <div class="attachment-info">
                         <span class="attachment-slot">${attachmentSlotLabel(item.slot)}</span>
@@ -1076,14 +1352,54 @@
                             — ${caption || 'no caption'}
                         </span>
                     </div>
+                    ${actions}
                 `;
-                existingAttachmentsEl.appendChild(row);
+                if (reorderable) {
+                    row.querySelector('.attachment-up').addEventListener('click', () => {
+                        moveExistingAttachmentRow(row, -1);
+                    });
+                    row.querySelector('.attachment-down').addEventListener('click', () => {
+                        moveExistingAttachmentRow(row, 1);
+                    });
+                }
+                parent.appendChild(row);
+            }
+
+            MECHANICS_PHASES.forEach((phase) => {
+                const groupItems = bySlot[phase.slot] || [];
+                if (!groupItems.length) return;
+                const label = document.createElement('div');
+                label.className = 'attachment-group-label';
+                label.textContent = `${phase.label} (${groupItems.length})`;
+                existingAttachmentsEl.appendChild(label);
+                const group = document.createElement('div');
+                group.className = 'attachment-group';
+                group.dataset.slot = phase.slot;
+                groupItems.forEach((item) => {
+                    appendAttachmentRow(group, item, { reorderable: groupItems.length > 1 });
+                });
+                existingAttachmentsEl.appendChild(group);
             });
 
+            if (extras.length) {
+                const label = document.createElement('div');
+                label.className = 'attachment-group-label';
+                label.textContent = `Other visuals (${extras.length})`;
+                existingAttachmentsEl.appendChild(label);
+                const group = document.createElement('div');
+                group.className = 'attachment-group';
+                group.dataset.slot = 'other';
+                extras.forEach((item) => {
+                    appendAttachmentRow(group, item, { reorderable: extras.length > 1 });
+                });
+                existingAttachmentsEl.appendChild(group);
+            }
+
+            refreshExistingAttachmentOrderLabels();
             const helper = document.createElement('div');
             helper.className = 'helper-text';
             helper.textContent =
-                'Selected images will be deleted when Generate PDF is clicked.';
+                'Selected images will be deleted when Generate PDF is clicked. ↑ ↓ changes photo order on the PDF.';
             existingAttachmentsEl.appendChild(helper);
         }
 
@@ -1518,10 +1834,10 @@
             try {
                 const response = await fetch(`${API_URL}/recent?limit=100`);
                 if (!response.ok) return;
-                const data = await response.json();
+                    const data = await response.json();
                 const assessments = data.assessments || [];
-
-                const playerDatalist = document.getElementById('playerNames');
+                    
+                    const playerDatalist = document.getElementById('playerNames');
                 playerDatalist.innerHTML = '';
                 [...new Set(assessments.map(a => a.player_name).filter(Boolean))]
                     .sort((a, b) => a.localeCompare(b))
@@ -1531,7 +1847,7 @@
                         playerDatalist.appendChild(option);
                     });
 
-                const trainerDatalist = document.getElementById('trainerNames');
+                    const trainerDatalist = document.getElementById('trainerNames');
                 trainerDatalist.innerHTML = '';
                 [...new Set(assessments.map(a => a.trainer_name).filter(Boolean))]
                     .sort((a, b) => a.localeCompare(b))
@@ -1577,23 +1893,87 @@
             }
         }
 
-        function reportLinkHtml(uri, { version } = {}) {
-            if (!uri) {
-                return '<div style="margin-top:8px">No PDF URI returned — use Regenerate PDF below with the assessment ID.</div>';
+        function reportReadyHtml(assessmentId, { version, downloaded = false, downloadError } = {}) {
+            const id = Number(assessmentId);
+            if (!Number.isInteger(id) || id < 1) {
+                return '<div style="margin-top:8px">No PDF available — use Regenerate PDF below.</div>';
             }
-            const label = version != null
-                ? `Open draft PDF (v${version})`
-                : 'Open draft PDF';
-            if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('gs://')) {
-                const href = uri.startsWith('gs://')
-                    ? `https://console.cloud.google.com/storage/browser/_details/${uri.slice(5)}`
-                    : uri;
-                return `<div style="margin-top:8px"><a href="${href}" target="_blank" rel="noopener">${label}</a></div>`;
+            const ver = version != null ? ` (v${version})` : '';
+            if (downloadError) {
+                return (
+                    `<div style="margin-top:8px">PDF ready${ver}, but download failed: ${downloadError}. ` +
+                    `<button type="button" class="secondary-btn report-download-btn" data-assessment-id="${id}"` +
+                    (version != null ? ` data-version="${version}"` : '') +
+                    `>Download PDF</button></div>`
+                );
             }
-            if (uri.startsWith('file://')) {
-                return `<div style="margin-top:8px">Draft PDF saved on server: <code>${uri.replace('file://', '')}</code></div>`;
+            if (downloaded) {
+                return `<div style="margin-top:8px">PDF${ver} download started.</div>`;
             }
-            return `<div style="margin-top:8px">Report URI: ${uri}</div>`;
+            return (
+                `<div style="margin-top:8px">PDF ready${ver}. ` +
+                `<button type="button" class="secondary-btn report-download-btn" data-assessment-id="${id}"` +
+                (version != null ? ` data-version="${version}"` : '') +
+                `>Download PDF</button></div>`
+            );
+        }
+
+        function filenameFromContentDisposition(header, fallback) {
+            if (!header) return fallback;
+            const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+            if (star) {
+                try {
+                    return decodeURIComponent(star[1].trim());
+                } catch (_) { /* ignore */ }
+            }
+            const plain = /filename="?([^";]+)"?/i.exec(header);
+            return plain ? plain[1].trim() : fallback;
+        }
+
+        async function downloadReportPdf(assessmentId, { version } = {}) {
+            const id = Number(assessmentId);
+            if (!Number.isInteger(id) || id < 1) {
+                throw new Error('Invalid assessment ID for download');
+            }
+            let url = `${API_URL}/${id}/report/download`;
+            if (version != null && version !== '') {
+                url += `?version=${encodeURIComponent(version)}`;
+            }
+            const response = await fetch(url);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Download failed (${response.status})`);
+            }
+            const blob = await response.blob();
+            const fallback = version != null
+                ? `assessment_${id}_v${version}.pdf`
+                : `assessment_${id}.pdf`;
+            const filename = filenameFromContentDisposition(
+                response.headers.get('Content-Disposition'),
+                fallback
+            );
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(objectUrl);
+            return filename;
+        }
+
+        async function downloadReportAfterGenerate(assessmentId, { version } = {}) {
+            try {
+                await downloadReportPdf(assessmentId, { version });
+                return reportReadyHtml(assessmentId, { version, downloaded: true });
+            } catch (err) {
+                console.error(err);
+                return reportReadyHtml(assessmentId, {
+                    version,
+                    downloadError: err.message || 'download failed',
+                });
+            }
         }
 
         function renderReportVersions(versions) {
@@ -1604,15 +1984,46 @@
                 return;
             }
             reportVersionsEl.innerHTML = versions.map((v) => {
-                const href = v.report_url || v.report_uri || v.gcs_uri || '';
-                const when = v.created_at ? ` · ${v.created_at}` : '';
+                const when = v.created_at || 'unknown time';
                 const legacy = v.legacy ? ' (legacy)' : '';
-                const open = href
-                    ? `<a href="${href}" target="_blank" rel="noopener">Open v${v.version_num}${legacy}</a>`
-                    : `v${v.version_num}${legacy}`;
-                return `<div class="existing-attachment-row">${open}${when}</div>`;
+                const ver = v.version_num;
+                const link =
+                    `<a href="#" class="report-download-btn" ` +
+                    `data-assessment-id="${v.assessment_id}" data-version="${ver}">` +
+                    `Download</a>`;
+                return (
+                    `<div class="existing-attachment-row">` +
+                    `<span>v${ver}${legacy} · ${when}</span>${link}` +
+                    `</div>`
+                );
             }).join('');
         }
+
+        document.addEventListener('click', (event) => {
+            const btn = event.target.closest('.report-download-btn');
+            if (!btn) return;
+            event.preventDefault();
+            if (btn.getAttribute('aria-busy') === 'true') return;
+            const assessmentId = btn.getAttribute('data-assessment-id');
+            const versionAttr = btn.getAttribute('data-version');
+            const version = versionAttr != null && versionAttr !== ''
+                ? Number(versionAttr)
+                : undefined;
+            const prev = btn.textContent;
+            btn.setAttribute('aria-busy', 'true');
+            btn.textContent = 'Downloading…';
+            downloadReportPdf(assessmentId, {
+                version: Number.isFinite(version) ? version : undefined,
+            })
+                .catch((err) => {
+                    console.error(err);
+                    alert(err.message || 'Download failed');
+                })
+                .finally(() => {
+                    btn.removeAttribute('aria-busy');
+                    btn.textContent = prev;
+                });
+        });
 
         async function fetchReportVersions(assessmentId) {
             const response = await fetch(`${API_URL}/${assessmentId}/report-versions`);
@@ -1668,10 +2079,9 @@
                     (onSuccessMessage
                         ? onSuccessMessage(data)
                         : `✓ PDF ready for assessment #${data.assessment_id}.`) +
-                    reportLinkHtml(
-                        data.report_url || data.report_uri || data.report_gcs_uri,
-                        { version: data.report_version }
-                    );
+                    await downloadReportAfterGenerate(data.assessment_id || id, {
+                        version: data.report_version,
+                    });
                 refreshReportVersions(data.assessment_id || id);
                 return html;
             } finally {
@@ -1705,15 +2115,33 @@
                     updates.usedHittrax = regenUsedHittraxEl.checked;
                     updates.usedVald = regenUsedValdEl.checked;
                 }
+                // Always send current phase notes so cards stay in sync with the form.
+                updates.mechanicsPhaseNotes = collectMechanicsPhaseNotes(regenMechanicsRowsEl);
 
                 const deleteData = await deleteSelectedAttachments(id, false);
                 const deletedCount = deleteData?.deleted?.length || 0;
+                if (deletedCount) {
+                    existingAttachmentsEl.querySelectorAll('.attachment-select:checked').forEach((box) => {
+                        box.closest('.attachment-row')?.remove();
+                    });
+                    refreshExistingAttachmentOrderLabels();
+                }
                 let uploadedCount = 0;
+                let reordered = false;
+
+                if (regenAttachmentOrderDirty && collectExistingAttachmentOrder().length) {
+                    await saveExistingAttachmentOrder(id);
+                    reordered = true;
+                    regenAttachmentOrderDirty = false;
+                }
 
                 if (visuals.length) {
                     const uploadData = await uploadVisuals(id, visuals, { regenerate: false });
                     uploadedCount = uploadData.uploaded?.length || 0;
-                    initMechanicsRows(regenMechanicsRowsEl);
+                    initMechanicsRows(
+                        regenMechanicsRowsEl,
+                        collectMechanicsPhaseNotes(regenMechanicsRowsEl)
+                    );
                     regenVisualRowsEl.innerHTML = '';
                     addVisualRow(regenVisualRowsEl, regenAddVisualBtn);
                 }
@@ -1721,9 +2149,11 @@
                 const changes = [];
                 if (deletedCount) changes.push(`removed ${deletedCount} image(s)`);
                 if (uploadedCount) changes.push(`uploaded ${uploadedCount} image(s)`);
+                if (reordered) changes.push('updated photo order');
                 if (regenNotesDirty) changes.push('updated notes');
                 if (regenVideoDirty) changes.push('updated video link');
                 if (regenToolsDirty) changes.push('updated tools');
+                if (regenPhaseNotesDirty) changes.push('updated phase notes');
                 const html = await regenerateReport(id, {
                     button: regenBtn,
                     updates,
@@ -1735,6 +2165,7 @@
                 regenNotesDirty = false;
                 regenVideoDirty = false;
                 regenToolsDirty = false;
+                regenPhaseNotesDirty = false;
 
                 if (hadLoadedAttachments) {
                     renderExistingAttachments(id, await loadExistingAttachments(id));
@@ -1774,7 +2205,7 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             messageEl.classList.remove('show');
-
+            
             const playerName = titleCaseName(playerNameInput.value.trim());
             playerNameInput.value = playerName;
 
@@ -1809,6 +2240,7 @@
                 usedBlast: document.getElementById('usedBlast').checked,
                 usedHittrax: document.getElementById('usedHittrax').checked,
                 usedVald: document.getElementById('usedVald').checked,
+                mechanicsPhaseNotes: collectMechanicsPhaseNotes(mechanicsRowsEl),
             };
             if (assessmentType === 'retest') {
                 formData.previousAssessmentId = Number(previousSelect.value);
@@ -1839,9 +2271,14 @@
                     regenUsedBlastEl.checked = formData.usedBlast;
                     regenUsedHittraxEl.checked = formData.usedHittrax;
                     regenUsedValdEl.checked = formData.usedVald;
+                    initMechanicsRows(
+                        regenMechanicsRowsEl,
+                        formData.mechanicsPhaseNotes || {}
+                    );
                     regenNotesDirty = false;
                     regenVideoDirty = false;
                     regenToolsDirty = false;
+                    regenPhaseNotesDirty = false;
                     regenLoadedId = String(data.assessment_id);
                     existingAttachmentsEl.innerHTML = '';
 
@@ -1872,12 +2309,24 @@
                         refreshReportVersions(data.assessment_id);
                     }
 
+                    let downloadNote = '';
+                    if (reportUri) {
+                        downloadNote = await downloadReportAfterGenerate(data.assessment_id, {
+                            version: reportVersion,
+                        });
+                    } else {
+                        downloadNote = reportReadyHtml(data.assessment_id, {
+                            version: reportVersion,
+                            downloadError: 'no PDF was generated',
+                        });
+                    }
+
                     showMessage(
                         `✓ Assessment #${data.assessment_id} saved for ${data.player}` +
                         (prettyType ? ` (${prettyType})` : '') +
                         `.` +
                         visualNote +
-                        reportLinkHtml(reportUri, { version: reportVersion }) +
+                        downloadNote +
                         `<div class="inline-actions">` +
                         `<button type="button" class="secondary-btn" id="successRegenBtn">Regenerate PDF</button>` +
                         `</div>`,

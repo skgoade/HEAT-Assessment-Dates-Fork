@@ -48,8 +48,8 @@ Example: no VALD that day → uncheck VALD so empty VALD pages don’t appear.
   - Numbered lists with `1. `
   - Headings with `# ` / `## `
 
-### 6. Mechanics photos (optional)
-Upload the five phase shots when you have them:
+### 6. Mechanics phase cards (optional)
+Each swing phase gets its own card:
 
 1. Load phase  
 2. Load position  
@@ -57,7 +57,11 @@ Upload the five phase shots when you have them:
 4. Launch position  
 5. Impact  
 
-Add a short caption under each (these become labels in the PDF). All five are laid out on one mechanics page when present.
+Per phase you can add:
+- **Notes** (coach cues for that stage — shown on the PDF card)
+- **Up to 3 photos** (Load often needs two stills). Optional short captions label individual photos. Use **↑ ↓** to set left-to-right / first-to-last order on the PDF card.
+
+Cards with notes and/or photos appear on the Mechanics page of the PDF.
 
 ### 7. Extra visuals (optional)
 Screenshots (HitTrax exports, VALD cards, etc.). Use ↑ ↓ to set PDF order. Captions are recommended.
@@ -94,10 +98,11 @@ No need to click Load first (there is still a **Reload from saved assessment** b
 ### Edit before generating
 - Change notes, tools, or video link as needed.
 - **Delete images:** check the ones to remove, then generate — they are deleted when you click Generate PDF.
+- **Reorder phase photos:** use ↑ ↓ in **Images already attached** (within that phase). The new order is saved when you generate.
 - **Add images:** use the mechanics / extra visual rows the same way as on a new submit.
 
 ### Generate
-Click **Generate PDF**. The PDF is rebuilt and uploaded as a **new version** (older PDFs stay available under **PDF version history**). The success message includes a signed link to open the latest draft.
+Click **Generate PDF**. The PDF is rebuilt and uploaded as a **new version** (older PDFs stay available under **PDF version history**). Your browser should **download the PDF automatically**; you can also download any prior version from the history list.
 
 If player + visit lookup finds nothing, create a **new** assessment at the top of the form instead.
 
@@ -109,16 +114,25 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 |---------|--------|
 | Header (player, visit type, video link) | Form + assessment record |
 | Current snapshot / HitTrax / Blast / VALD tables | That day’s data for checked tools; Δ vs previous/baseline when available |
-| Batted ball visuals | Auto from HitTrax (zones, contact location, EV×LA, spray) |
+| Batted ball profile | HitTrax session totals (EV / LA / distance) |
+| Swing metrics | Blast by bat (Game / Handle / Barrel / Under), side-by-side |
+| Flight & spray | Spray (emphasized) + EV×LA |
+| Batted ball by location | Avg EV / LA / distance by pull–middle–oppo and by zone, then zone EV/LA maps |
+| Contact location | Plate (vertical + depth) and square average-POI zone chart |
 | VALD charts + metric definitions | Auto from VALD when enabled |
-| Mechanics + extra images | Your uploads + captions |
+| Mechanics phase cards | Your per-phase notes + photos |
+| Extra images | Your uploads + captions |
 | Assessment notes | Your notes (end of report) |
 
-**EV × LA “Optimal LA”:** based on a hang-time style proxy from the session’s EV vs launch-angle trend (often near ~80° when EV only falls gently with LA). It is not peak carry distance. *(Pending Noah sign-off on this rule vs a different optimal-LA definition.)*
+**Blast by bat:** swings are grouped from Blast `equipment_name` / nickname into **Game Bat**, **Handle Load**, **Barrel Load**, and **Under Load** (substring match; anything else counts as Game Bat). The PDF shows one side-by-side Swing Metrics table so all bats line up for comparison (current date + Δ previous + Δ initial under each bat). Snapshot peak bat speed prefers Game Bat when multiple bats were used.
+
+**EV × LA:** launch angle on the x-axis; exit velocity (left) and distance (right). Circles are EV by flight type; diamonds are distance. No predicted-carry / peak-LA overlay yet — that waits on a larger-sample model.
+
+**Spray:** batted balls on the field, colored by EV. Labeled arcs are distance from home (ft).
+
+**PDF downloads:** after submit/regenerate, the form downloads the PDF through the API (not a public GCS link). Use **PDF version history** to download older drafts.
 
 **Previous vs baseline:** if they are the same visit (e.g. first retest), the PDF shows only **Previous** so the comparison isn’t duplicated.
-
-**PDF links:** reports live in a private Google Cloud bucket. Open links from the form (they are time-limited). Opening a raw `storage.googleapis.com` URL in a new tab without a signature will show Access Denied.
 
 ---
 
@@ -128,7 +142,7 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 - Prefer **captions** on photos the first time so you don’t need a cleanup regen.
 - To replace a bad photo: check it under “Images already attached,” add the new file, then Generate PDF.
 - Retest labels (1st / 2nd / 3rd…) are automatic from that player’s history.
-- Use **PDF version history** on the regenerate section to reopen an older draft after a later regenerate.
+- Use **PDF version history** on the regenerate section to download an older draft after a later regenerate.
 
 ---
 
@@ -136,6 +150,6 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 
 - Empty metrics for a tool → confirm the tool checkbox, the assessment **date**, and that data exists for that player that day.
 - Form or PDF errors → note the assessment ID and what you clicked, and contact whoever maintains the HEAT assessment backend.
-- Access Denied on a PDF → reload the assessment in the form and use the new Open link (or ask eng to check signed-URL IAM — `docs/NOAH_OPS.md`).
+- Download fails → confirm you’re on the published form (points at `heat-assessment-api`) and try the **Download PDF** button again.
 
 For engineering setup (database, deploy, API), see [QUICKSTART.md](QUICKSTART.md), [NOAH_OPS.md](NOAH_OPS.md), and the repo [README](../README.md).

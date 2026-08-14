@@ -201,8 +201,11 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
     Prefer raw ingest (hittrax_plays + hittrax_session). Use HitTrax **Velo**
     (exit speed) not EBV1 — EBV1 includes negatives/zeros and is not report EV.
     Only rows with Velo > 0 (measured contact). Convert SI → mph / feet.
-    Include HorzAngle / PBH / PBV / Intersect1–3 for PDF charts (raw plays only).
-    Fall back to silver tables (already unit-converted) if the join path fails.
+
+    Plate-crossing location for zone charts: **PP1/PP2** (meters) and **QD**
+    (HitTrax 1–13 zone id). PBH/PBV are pitch *break*, not plate position.
+    Depth of contact: **Intersect3 − PP3** (meters; PP3 ≈ plate depth / front-edge zero).
+    Fall back to silver tables (already unit-converted; no PP/QD) if the join path fails.
     """
     mps_to_mph = 2.23694
     m_to_ft = 3.28084
@@ -213,8 +216,13 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
             p.Elv AS launch_angle,
             p.Dist * {m_to_ft} AS distance,
             p.HorzAngle AS horz_angle,
+            p.Hand AS hand,
             p.PBH AS pbh,
             p.PBV AS pbv,
+            p.PP1 AS pp1,
+            p.PP2 AS pp2,
+            p.PP3 AS pp3,
+            p.QD AS qd,
             p.Intersect1 AS intersect1,
             p.Intersect2 AS intersect2,
             p.Intersect3 AS intersect3,
@@ -229,7 +237,8 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
         """
         SELECT
             Velo AS ev, Elv AS launch_angle, Dist AS distance,
-            NULL AS horz_angle, NULL AS pbh, NULL AS pbv,
+            NULL AS horz_angle, NULL AS hand, NULL AS pbh, NULL AS pbv,
+            NULL AS pp1, NULL AS pp2, NULL AS pp3, NULL AS qd,
             NULL AS intersect1, NULL AS intersect2, NULL AS intersect3, TS
         FROM HitTraxSwingSilver
         WHERE UserName = %s AND TS BETWEEN %s AND %s AND Velo > 0
@@ -237,7 +246,8 @@ def _hittrax_rows(conn, player_name: str, start: datetime, end: datetime) -> lis
         """
         SELECT
             Velo AS ev, Elv AS launch_angle, Dist AS distance,
-            NULL AS horz_angle, NULL AS pbh, NULL AS pbv,
+            NULL AS horz_angle, NULL AS hand, NULL AS pbh, NULL AS pbv,
+            NULL AS pp1, NULL AS pp2, NULL AS pp3, NULL AS qd,
             NULL AS intersect1, NULL AS intersect2, NULL AS intersect3, TS
         FROM RBI_HitTraxSwingSilver
         WHERE UserName = %s AND TS BETWEEN %s AND %s AND Velo > 0
@@ -268,14 +278,27 @@ def hittrax_contacts_for_charts(rows: list[dict]) -> list[dict[str, Any]]:
             except (TypeError, ValueError):
                 return None
 
+        qd_raw = r.get("qd")
+        qd: Optional[int] = None
+        if qd_raw is not None:
+            try:
+                qd = int(qd_raw)
+            except (TypeError, ValueError):
+                qd = None
+
         contacts.append(
             {
                 "ev": _f("ev"),
                 "launch_angle": _f("launch_angle"),
                 "distance": _f("distance"),
                 "horz_angle": _f("horz_angle"),
+                "hand": r.get("hand"),
                 "pbh": _f("pbh"),
                 "pbv": _f("pbv"),
+                "pp1": _f("pp1"),
+                "pp2": _f("pp2"),
+                "pp3": _f("pp3"),
+                "qd": qd,
                 "intersect1": _f("intersect1"),
                 "intersect2": _f("intersect2"),
                 "intersect3": _f("intersect3"),
@@ -284,8 +307,53 @@ def hittrax_contacts_for_charts(rows: list[dict]) -> list[dict[str, Any]]:
     return contacts
 
 
-def aggregate_blast(rows: list[dict]) -> dict[str, Any]:
-    """Summarize Blast swings into peak/avg/SD bat speed and attack angle."""
+# Assessment Blast bat groups (substring match on equipment_name / nickname).
+# Order is PDF display order: game bat first, then load bats.
+BLAST_BAT_ORDER: list[str] = [
+    "game_bat",
+    "handle_load",
+    "barrel_load",
+    "under_load",
+]
+BLAST_BAT_LABELS: dict[str, str] = {
+    "game_bat": "Game Bat",
+    "handle_load": "Handle Load",
+    "barrel_load": "Barrel Load",
+    "under_load": "Under Load",
+}
+# (key, label, needles) — needles matched case-insensitively against name+nickname
+BLAST_BAT_GROUP_DEFS: list[tuple[str, str, tuple[str, ...]]] = [
+    ("barrel_load", "Barrel Load", ("barrel load", "barrelload", "barrel-load")),
+    ("handle_load", "Handle Load", ("handle load", "handleload", "handle-load")),
+    ("under_load", "Under Load", ("under load", "underload", "under-load")),
+]
+
+
+def classify_blast_bat(
+    equipment_name: Optional[str] = None,
+    equipment_nickname: Optional[str] = None,
+) -> str:
+    """
+    Map Blast equipment strings to assessment bat groups.
+
+    HEAT sessions use barrel / handle / under load bats plus a game bat.
+    Names vary (e.g. \"barrel load 32\"); game-bat labels vary the most, so
+    anything that is not an explicit load bat is treated as Game Bat.
+    """
+    text = f"{equipment_name or ''} {equipment_nickname or ''}".strip().lower()
+    text = " ".join(text.split())
+    for key, _label, needles in BLAST_BAT_GROUP_DEFS:
+        if any(n in text for n in needles):
+            return key
+    return "game_bat"
+
+
+def blast_bat_label(bat_key: str) -> str:
+    return BLAST_BAT_LABELS.get(bat_key, bat_key.replace("_", " ").title())
+
+
+def _blast_stats(rows: list[dict]) -> dict[str, Any]:
+    """Peak/avg/SD bat speed and attack angle for a swing list."""
     bat = [float(r["metric_bat_speed"]) for r in rows if r.get("metric_bat_speed") is not None]
     peak_bat = [
         float(r["metric_peak_bat_speed"])
@@ -304,6 +372,43 @@ def aggregate_blast(rows: list[dict]) -> dict[str, Any]:
         "avg_attack_angle": aa_stats["avg"],
         "sd_attack_angle": aa_stats["sd"],
     }
+
+
+def aggregate_blast(rows: list[dict]) -> dict[str, Any]:
+    """
+    Summarize Blast swings overall and by bat group.
+
+    Top-level keys stay day-wide (for snapshot / backward compatibility).
+    ``by_bat`` is an ordered list of per-group stats for the PDF.
+    """
+    overall = _blast_stats(rows)
+    grouped: dict[str, list[dict]] = {}
+    for r in rows:
+        key = classify_blast_bat(r.get("equipment_name"), r.get("equipment_nickname"))
+        grouped.setdefault(key, []).append(r)
+
+    by_bat: list[dict[str, Any]] = []
+    for key in BLAST_BAT_ORDER:
+        group_rows = grouped.get(key) or []
+        if not group_rows:
+            continue
+        stats = _blast_stats(group_rows)
+        stats["bat_key"] = key
+        stats["bat_label"] = blast_bat_label(key)
+        by_bat.append(stats)
+
+    overall["by_bat"] = by_bat
+    return overall
+
+
+def blast_group_stats(blast: Optional[dict], bat_key: str) -> dict[str, Any]:
+    """Look up one bat group's stats from an aggregate_blast result."""
+    if not blast:
+        return {}
+    for item in blast.get("by_bat") or []:
+        if item.get("bat_key") == bat_key:
+            return item
+    return {}
 
 
 def aggregate_hittrax(rows: list[dict]) -> dict[str, Any]:
@@ -344,6 +449,149 @@ def aggregate_hittrax(rows: list[dict]) -> dict[str, Any]:
         "avg_ev_ideal_la": _safe_stats(ideal_evs)["avg"],
         "avg_distance": _safe_stats(dists)["avg"],
     }
+
+
+# HitTrax location breakdown (example-PDF "By Field" / "By Zone" table).
+# HorzAngle: 0° ≈ CF; negative ≈ LF; positive ≈ RF (matches spray chart).
+HITTRAX_FIELD_ORDER: list[tuple[str, str]] = [
+    ("pull", "Pull Side"),
+    ("middle", "Middle"),
+    ("oppo", "Oppo"),
+]
+HITTRAX_ZONE_ORDER: list[tuple[str, str]] = [
+    ("inside", "Inside"),
+    ("middle_h", "Middle"),
+    ("outside", "Outside"),
+    ("high", "High"),
+    ("middle_v", "Middle Height"),
+    ("low", "Low"),
+]
+_FIELD_ANGLE_MID = 15.0  # |HorzAngle| ≤ 15° counts as middle of the field
+
+# Catcher's-view zone ids → left / middle / right (x) and high / mid / low (y).
+_ZONE_CATCHER_LEFT = {"z00", "z10", "z20", "outer_tl", "outer_bl"}
+_ZONE_CATCHER_MID_H = {"z01", "z11", "z21"}
+_ZONE_CATCHER_RIGHT = {"z02", "z12", "z22", "outer_tr", "outer_br"}
+_ZONE_HIGH = {"z00", "z01", "z02", "outer_tl", "outer_tr"}
+_ZONE_MID_V = {"z10", "z11", "z12"}
+_ZONE_LOW = {"z20", "z21", "z22", "outer_bl", "outer_br"}
+
+
+def _hittrax_hand_is_left(hand: Any) -> bool:
+    """HitTrax Hand: 2 / L / left → LHH; 0/1 / R / right (and unknown) → RHH."""
+    if hand is None:
+        return False
+    text = str(hand).strip().lower()
+    return text in {"2", "l", "left", "lh", "lhh"}
+
+
+def _modal_hand_is_left(contacts: list[dict[str, Any]]) -> bool:
+    votes = [c.get("hand") for c in contacts if c.get("hand") not in (None, "")]
+    if not votes:
+        return False
+    # Majority vote; ties default to right-handed.
+    left = sum(1 for h in votes if _hittrax_hand_is_left(h))
+    return left > len(votes) - left
+
+
+def _field_bucket(horz_angle: Optional[float], hand_is_left: bool) -> Optional[str]:
+    if horz_angle is None:
+        return None
+    try:
+        ha = float(horz_angle)
+    except (TypeError, ValueError):
+        return None
+    if abs(ha) <= _FIELD_ANGLE_MID:
+        return "middle"
+    toward_rf = ha > 0
+    if hand_is_left:
+        return "pull" if toward_rf else "oppo"
+    return "pull" if not toward_rf else "oppo"
+
+
+def _zone_buckets(zone_id: Optional[str], hand_is_left: bool) -> list[str]:
+    """
+    Return horizontal and/or vertical zone keys for one contact.
+
+    Inside/outside flip with handedness (catcher-left = inside for RHH).
+    """
+    if not zone_id:
+        return []
+    out: list[str] = []
+    if zone_id in _ZONE_CATCHER_MID_H:
+        out.append("middle_h")
+    elif zone_id in _ZONE_CATCHER_LEFT:
+        out.append("outside" if hand_is_left else "inside")
+    elif zone_id in _ZONE_CATCHER_RIGHT:
+        out.append("inside" if hand_is_left else "outside")
+
+    if zone_id in _ZONE_HIGH:
+        out.append("high")
+    elif zone_id in _ZONE_MID_V:
+        out.append("middle_v")
+    elif zone_id in _ZONE_LOW:
+        out.append("low")
+    return out
+
+
+def _avg_triple(rows: list[dict[str, Any]]) -> dict[str, Optional[float]]:
+    evs = [float(r["ev"]) for r in rows if r.get("ev") is not None]
+    las = [float(r["launch_angle"]) for r in rows if r.get("launch_angle") is not None]
+    dists = [float(r["distance"]) for r in rows if r.get("distance") is not None]
+    return {
+        "avg_ev": _safe_stats(evs)["avg"],
+        "avg_launch_angle": _safe_stats(las)["avg"],
+        "avg_distance": _safe_stats(dists)["avg"],
+        "contact_count": len(rows),
+    }
+
+
+def aggregate_hittrax_location_breakdown(
+    contacts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Avg EV / LA / distance by field third and by plate zone.
+
+    Used for the example-PDF location comparison table.
+    """
+    # Lazy import avoids pulling matplotlib when only metrics are needed.
+    from report_charts import _assign_zone_from_contact
+
+    hand_is_left = _modal_hand_is_left(contacts)
+    field_buckets: dict[str, list[dict]] = {k: [] for k, _ in HITTRAX_FIELD_ORDER}
+    zone_buckets: dict[str, list[dict]] = {k: [] for k, _ in HITTRAX_ZONE_ORDER}
+
+    for c in contacts:
+        fb = _field_bucket(c.get("horz_angle"), hand_is_left)
+        if fb in field_buckets:
+            field_buckets[fb].append(c)
+        zid = _assign_zone_from_contact(c)
+        for zb in _zone_buckets(zid, hand_is_left):
+            if zb in zone_buckets:
+                zone_buckets[zb].append(c)
+
+    return {
+        "handedness": "left" if hand_is_left else "right",
+        "by_field": {k: _avg_triple(v) for k, v in field_buckets.items()},
+        "by_zone": {k: _avg_triple(v) for k, v in zone_buckets.items()},
+    }
+
+
+def hittrax_breakdown_value(
+    breakdown: Optional[dict],
+    section: str,
+    key: str,
+    field: str,
+) -> Optional[float]:
+    """Look up one avg metric from a location breakdown dict."""
+    if not breakdown:
+        return None
+    block = (breakdown.get(section) or {}).get(key) or {}
+    val = block.get(field)
+    try:
+        return float(val) if val is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _serialize_side(side: Optional[dict]) -> Optional[dict]:
@@ -599,6 +847,19 @@ VALD_METRIC_DEF_KEYS: list[tuple[str, str]] = [
     ("IMTP RFD 100ms", "RFD - 100ms"),
 ]
 
+# Coach-facing units for VALD comparison-table labels (ForceDecks SI).
+VALD_METRIC_UNITS: dict[str, str] = {
+    "CMJ Jump Height (FT)": "cm",
+    "CMJ Peak Power / BM": "W/kg",
+    "CMJ RSI-modified": "m/s",
+    "SJ Jump Height (FT)": "cm",
+    "SJ Peak Power / BM": "W/kg",
+    "HJ Best RSI": "m/s",
+    "HJ Best Jump Height": "cm",
+    "IMTP Peak Force / BM": "N/kg",
+    "IMTP RFD 100ms": "N/s",
+}
+
 # Short coach-facing fallbacks when vald_dictionary is unavailable.
 VALD_METRIC_DEF_FALLBACKS: dict[str, str] = {
     "Jump Height (Flight Time)": (
@@ -680,6 +941,11 @@ HITTRAX_CHART_CONTEXT: dict[str, str] = {
         "Average launch angle by pitch location. Use with the EV zone chart to "
         "see whether hard contact is also leaving at a useful trajectory."
     ),
+    "zone_poi": (
+        "Average Point of Impact (depth of contact) by pitch location. Negative = "
+        "deeper / toward the catcher; positive = out in front of the plate. Same "
+        "13-zone layout as the EV/LA charts."
+    ),
     "plate_vert": (
         "Catcher's view of contact height × lateral location (inch markers), "
         "colored by EV. Dashed box is the strike zone; clustering shows where "
@@ -691,13 +957,14 @@ HITTRAX_CHART_CONTEXT: dict[str, str] = {
         "average exit velo at each depth."
     ),
     "ev_la": (
-        "Each dot is a batted ball (color = flight type). The navy line is the EV↔LA "
-        "trend; the blue curve is a hang-time proxy (EV·sin LA). Optimal LA is where "
-        "that proxy peaks — typically near ~80° when EV falls only gently with LA."
+        "Each batted ball is plotted twice: filled circles are exit velocity (left axis), "
+        "open diamonds are distance (right axis). X is launch angle. Color is flight type "
+        "(GB / LD / FB / PU). No session-level fit — a larger-sample model comes later."
     ),
     "spray": (
         "Field spray of batted balls (direction × distance), colored by exit velocity. "
-        "Shows pull/oppo tendency and how hard contact is distributed across the field."
+        "Arcs are distance from home (ft). Shows pull/oppo tendency and how hard contact "
+        "is distributed across the field."
     ),
 }
 
@@ -743,15 +1010,16 @@ def fetch_vald_metric_definitions(
 
 
 def vald_definitions_for_report(conn) -> list[dict[str, str]]:
-    """Ordered unique definition rows for metrics shown in the VALD table."""
+    """
+    Definition rows for each VALD table metric (one per report label).
+
+    Includes report_label so the PDF can place the description next to
+    the matching comparison-table row.
+    """
     lookup_names = [vald_name for _, vald_name in VALD_METRIC_DEF_KEYS]
     db_defs = fetch_vald_metric_definitions(conn, lookup_names)
     rows: list[dict[str, str]] = []
-    seen: set[str] = set()
-    for _label, vald_name in VALD_METRIC_DEF_KEYS:
-        if vald_name in seen:
-            continue
-        seen.add(vald_name)
+    for report_label, vald_name in VALD_METRIC_DEF_KEYS:
         db = db_defs.get(vald_name) or {}
         desc = (db.get("description") or "").strip() or VALD_METRIC_DEF_FALLBACKS.get(
             vald_name, ""
@@ -760,6 +1028,7 @@ def vald_definitions_for_report(conn) -> list[dict[str, str]]:
             continue
         rows.append(
             {
+                "report_label": report_label,
                 "label": vald_name,
                 "description": desc,
                 "unit": (db.get("unit") or "").strip(),
@@ -777,6 +1046,9 @@ def metrics_for_assessment(conn, row: dict, *, include_chart_series: bool = Fals
     used_vald = bool(row.get("used_vald", 1))
     blast_rows = _blast_rows(conn, player, start, end) if used_blast else []
     hittrax_rows = _hittrax_rows(conn, player, start, end) if used_hittrax else []
+    hittrax_contacts = (
+        hittrax_contacts_for_charts(hittrax_rows) if used_hittrax else []
+    )
     out: dict[str, Any] = {
         "assessment_id": row["assessment_id"],
         "player_name": player,
@@ -792,7 +1064,12 @@ def metrics_for_assessment(conn, row: dict, *, include_chart_series: bool = Fals
         "used_vald": used_vald,
         "blast": aggregate_blast(blast_rows) if used_blast else {},
         "hittrax": aggregate_hittrax(hittrax_rows) if used_hittrax else {},
-        "hittrax_contacts": hittrax_contacts_for_charts(hittrax_rows) if include_chart_series else [],
+        "hittrax_breakdown": (
+            aggregate_hittrax_location_breakdown(hittrax_contacts)
+            if used_hittrax
+            else {}
+        ),
+        "hittrax_contacts": hittrax_contacts if include_chart_series else [],
         "vald": aggregate_vald(conn, player, start, end) if used_vald else {},
     }
     if include_chart_series and used_vald:

@@ -52,6 +52,9 @@ For a local backend, add before the main script:
 ```
 
 Do **not** point PDF work at legacy `hitting-assessment-api`.
+
+**Local testing (API + form on your machine):** see [LOCAL_TESTING.md](LOCAL_TESTING.md).
+
 ### Step 4: Test It!
 
 1. **Open the form**: Open `frontend/index.html` in your browser

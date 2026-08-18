@@ -162,6 +162,36 @@ def reorder_attachments(conn, assessment_id: int, ordered_ids: list[int]) -> lis
     return wanted
 
 
+def update_attachment_captions(
+    conn,
+    assessment_id: int,
+    captions: dict[int, str],
+) -> list[int]:
+    """Update caption text for attachments that belong to this assessment."""
+    if not captions:
+        return []
+    rows = list_attachments(conn, assessment_id)
+    known = {int(r["attachment_id"]) for r in rows}
+    updated: list[int] = []
+    with conn.cursor() as cur:
+        for raw_id, raw_caption in captions.items():
+            aid = int(raw_id)
+            if aid not in known:
+                continue
+            text = (raw_caption or "").strip()[:512] or None
+            cur.execute(
+                """
+                UPDATE assessment_attachments
+                SET caption = %s
+                WHERE assessment_id = %s AND attachment_id = %s
+                """,
+                (text, assessment_id, aid),
+            )
+            updated.append(aid)
+        conn.commit()
+    return updated
+
+
 def store_image_bytes(
     *,
     assessment_id: int,

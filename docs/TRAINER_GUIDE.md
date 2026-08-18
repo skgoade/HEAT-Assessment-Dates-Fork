@@ -8,25 +8,33 @@ Open the form in your browser (bookmark the URL your team uses). You do **not** 
 
 ## What this tool does
 
-1. You enter who was assessed, when, what tools you used, notes, photos, and an optional video link.
-2. On submit, the system pulls that day’s **Blast**, **HitTrax**, and **VALD** data (only for tools you checked), builds a draft PDF, and saves it.
-3. You can **regenerate** a PDF later to fix notes, tools, video link, or images without creating a new assessment.
+1. You choose **Submit a new assessment** or **Regenerate an existing PDF**.
+2. You move through one section at a time with **Next** / **Previous** (player, tools, photos, notes).
+3. On submit, the system pulls that day’s **Blast**, **HitTrax**, and **VALD** data (only for tools you checked), builds a draft PDF, and saves it.
+4. You can **regenerate** a PDF later to fix notes, tools, video link, or images without creating a new assessment.
 
 Metrics are tied to the **assessment calendar day** (that date only), not a ±7-day window.
 
+Use **Change** at the top if you picked the wrong path. Your entries stay filled.
+
 ---
 
-## New assessment (top of the form)
+## New assessment
 
-### 1. Player name
+Choose **Submit a new assessment**, then step through the sections.
+
+### 1. Athlete — player name
 - Type the player’s full name (autocomplete may suggest prior names).
 - If they’ve been assessed before, the form shows prior visits so you can pick Initial vs Retest and which previous assessment to compare against.
+- A peek under the name shows **athlete, assessment number** (Initial / 1st Retest / …), **height, weight, and age** — the same header fields as page 1 of the PDF. Age uses the assessment date below. If they are not in the directory, height / weight / age print as —.
 
-### 2. Assessment date
-- Use the date the session actually happened. Charts and tables pull data for that day.
+### 2. Athlete — assessment date
+- Use the date the session actually happened. Charts and tables pull data for that day. Age in the peek (and on the PDF) is calculated on this date.
 
-### 3. Tools used
-Check only what you used that day:
+Optional: trainer name. Click **Next**.
+
+### 3. Session — tools used
+The form looks up that player’s Blast / HitTrax / VALD rows for the assessment date and shows a short count under each checkbox (for example `38 contacts · peak EV 98.4 mph`, or `No tests found for this date`). On a **new** assessment it unchecks tools with no data; you can still check them if you want those pages anyway.
 
 | Tool | If unchecked… |
 |------|----------------|
@@ -34,22 +42,13 @@ Check only what you used that day:
 | **HitTrax** | HitTrax tables and batted-ball charts are hidden |
 | **VALD** | VALD tables and ForceDecks charts are hidden |
 
-Example: no VALD that day → uncheck VALD so empty VALD pages don’t appear.
+Example: peek says no VALD that day → leave VALD unchecked so empty VALD pages don’t appear.
 
-### 4. Video analysis link (optional)
+### 4. Session — video analysis link (optional)
 - Paste a YouTube / Drive / similar URL.
 - It shows as a clickable link near the top of the PDF.
 
-### 5. Page 1 notes (optional)
-- **Mechanical Observation** — left card under the swing sequence.
-- **Training Focus** — right card; bullets (`- item`) work well.
-- **Assessment Notes** — shorter strip under those two cards.
-
-Empty cards still print so the layout stays even. Light formatting is supported: `**bold**`, `*italic*`, `` `code` ``, `- ` bullets, numbered lists, and `# ` headings.
-
-- **Best of Day Summary** — one note for jump / hop / pull tests (later page). Leave blank to omit.
-
-### 6. Mechanics phase cards (optional)
+### 5. Swing photos — mechanics phase cards (optional)
 Each swing phase gets its own card:
 
 1. Load phase  
@@ -63,50 +62,60 @@ Per phase you can add:
 - **Caption** (coach cues for that stage — shown under the photo)
 - **One photo** per phase. PNG/JPEG/WebP, up to 4&nbsp;MB. The PDF shows each photo in the same portrait frame (center-cropped), so landscape or odd-sized uploads still line up.
 
-Cards appear in a left-to-right sequence on PDF page 1 (Swing Mechanics).
+Cards appear in a left-to-right sequence on PDF page 1 (Hitting Assessment).
 
-### 7. Extra visuals (optional)
+### 6. Extra images (optional)
 Screenshots and other context images. Use ↑ ↓ to set PDF order. Captions are recommended. Form checkboxes still say Blast / HitTrax / VALD so you can hide empty tool pages; those brand names are not printed on the PDF.
 
+### 7. Notes (optional)
+- **Mechanical Observation** — left card under the swing sequence.
+- **Training Focus** — right card.
+- **Assessment Notes** — shorter strip under those two cards.
+
+Empty cards still print so the layout stays even. Use the formatting bar on each box (**B**, *I*, Heading, Body, List) instead of typing markdown. Ctrl/Cmd+B and Ctrl/Cmd+I also work.
+
+- **Best of Day Summary** — one note for jump / hop / pull tests (later page).
+
 ### 8. Submit
-- Click **Submit Assessment**.
-- Success message includes the **assessment ID** (save it) and a link to the PDF when ready.
-- You can regenerate from that success message if needed.
+- On the last section, click **Submit Assessment**.
+- Success message includes the **assessment ID** (save it) and a download when ready.
+- You can regenerate from that success message, or **Start another** to return to the first screen.
 
 ---
 
-## Regenerate PDF (bottom of the form)
+## Regenerate PDF
 
-Use this when notes, tools, video link, or images need updating after the first draft.
+Choose **Regenerate an existing PDF** when notes, tools, video link, or images need updating after the first draft. You cannot continue past **Find assessment** until an assessment is selected and loaded.
 
 ### Find the assessment
 Pick one mode:
 
 **A) Assessment ID**  
-Enter the ID from the success message (e.g. `4`).
+Enter the ID from the success message (e.g. `4`). After it loads, the form peeks the player directory for that athlete.
 
 **B) Player name + visit**  
-Enter the player, then choose Initial / 1st Retest / 2nd Retest / etc. from the dropdown.
+Enter the player, then choose Initial / 1st Retest / 2nd Retest / etc. from the dropdown. The directory peek shows athlete + assessment number as soon as the name matches, even before a visit is chosen.
 
 Once the assessment is identified, the form **automatically loads**:
 
 - Existing notes  
 - Tools used  
 - Video analysis link (if any)  
-- Images already attached  
+- Phase photos into each mechanics card (preview + caption + Remove)  
+- Extra images into the extra-visual rows (preview + caption + Remove)  
 
-No need to click Load first (there is still a **Reload from saved assessment** button if you want to discard local edits and refetch).
+No need to click Load first (there is still a **Reload saved images** button on the Images step if you want to discard local edits and refetch). Then **Next** through Session, Images, and Notes.
 
 ### Edit before generating
-- Change notes, tools, or video link as needed.
-- **Delete images:** check the ones to remove, then generate — they are deleted when you click Generate PDF.
-- **Reorder phase photos:** use ↑ ↓ in **Images already attached** (within that phase). The PDF uses the first photo per phase.
-- **Add images:** one new photo per phase (remove an existing phase photo first if replacing). Extra visuals work the same as on a new submit.
+- Change notes, tools, or video link as needed. Session still shows a data peek so you can uncheck tools with no rows that day.
+- **Remove a photo:** use **Remove photo** on that phase card (or × on an extra image), then generate.
+- **Replace a photo:** choose a new file on that card; the old one is removed when you generate.
+- **Captions:** edit them on the card / extra row (they grow with the text). Extra-image order uses ↑ ↓.
 
 ### Generate
-Click **Generate PDF**. The PDF is rebuilt and uploaded as a **new version** (older PDFs stay available under **PDF version history**). Your browser should **download the PDF automatically**; you can also download any prior version from the history list.
+On the last section, click **Generate PDF**. The PDF is rebuilt and uploaded as a **new version** (older PDFs stay available under **PDF version history**). Your browser should **download the PDF automatically**; you can also download any prior version from the history list.
 
-If player + visit lookup finds nothing, create a **new** assessment at the top of the form instead.
+If player + visit lookup finds nothing, use **Change** and start a **new** assessment instead.
 
 ---
 
@@ -114,8 +123,7 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 
 | Section | Source |
 |---------|--------|
-| Page 1 header (athlete, date, type, trainer, video, height, weight, age, handedness) | Form + `player_directory` + that day’s handedness |
-| Swing sequence + Mechanical Observation / Training Focus / Assessment Notes | Phase photos/status/captions + the three page-1 cards |
+| Page 1 — Hitting Assessment header + swing sequence + Mechanical Observation / Training Focus / Assessment Notes | Form + `player_directory` + that day’s handedness; phase photos/status/captions + the three page-1 cards |
 | Batted Ball Profile (4 KPI cards + table) | That day’s batted-ball totals; ▲▼ vs previous |
 | Swing Metrics | Blast by bat (Game / Handle / Barrel / Under), side-by-side |
 | Batted ball by location | Location table, then EV/LA zone heatmaps side by side |
@@ -123,6 +131,7 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 | Flight & spray | Spray (labeled distance arcs) + EV×LA (dual y) |
 | Best of Day Metrics | Jump / hop / pull KPI cards + one optional summary; trend cards sit with that block |
 | Extra images | Your uploads + captions |
+| Wellness & Readiness (**retests only**, last page) | Self-reported check-ins for that training block |
 
 The PDF does **not** print HitTrax / Blast / VALD brand names. Form tool checkboxes still use those names so you can omit empty pages.
 
@@ -142,7 +151,7 @@ The PDF does **not** print HitTrax / Blast / VALD brand names. Form tool checkbo
 
 - Match the **player name spelling** to how Blast / HitTrax / VALD store the athlete, or metrics may be empty.
 - Prefer **captions** on photos the first time so you don’t need a cleanup regen.
-- To replace a bad photo: check it under “Images already attached,” add the new file, then Generate PDF.
+- To replace a bad photo: open **Regenerate**, go to **Images**, choose a new file on that card (or Remove, then add a file), then Generate PDF.
 - Retest labels (1st / 2nd / 3rd…) are automatic from that player’s history.
 - Use **PDF version history** on the regenerate section to download an older draft after a later regenerate.
 

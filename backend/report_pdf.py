@@ -176,6 +176,7 @@ def _notes_flowables(
     *,
     font_size: float = 9,
     leading: float = 12,
+    heading_as_title: bool = False,
 ) -> list:
     """
     Turn assessment notes into ReportLab flowables.
@@ -207,11 +208,11 @@ def _notes_flowables(
         spaceAfter=0.5,
     )
     heading = ParagraphStyle(
-        f"CoachNotesHeading{suffix}",
+        f"CoachNotesHeading{suffix}{'Title' if heading_as_title else ''}",
         parent=body,
         fontName="Helvetica-Bold",
-        fontSize=font_size + 1,
-        leading=leading + 1,
+        fontSize=8 if heading_as_title else font_size + 1,
+        leading=11 if heading_as_title else leading + 1,
         textColor=colors.HexColor("#0b3d5c"),
         spaceBefore=4,
         spaceAfter=2,
@@ -243,14 +244,17 @@ def _notes_flowables(
 
         if heading_match:
             flush_paragraph()
-            level = len(heading_match.group(1))
-            size = {1: 11, 2: 10, 3: 9}[level]
-            style = ParagraphStyle(
-                f"CoachNotesH{level}",
-                parent=heading,
-                fontSize=size,
-                leading=size + 3,
-            )
+            if heading_as_title:
+                style = heading
+            else:
+                level = len(heading_match.group(1))
+                size = {1: 11, 2: 10, 3: 9}[level]
+                style = ParagraphStyle(
+                    f"CoachNotesH{level}",
+                    parent=heading,
+                    fontSize=size,
+                    leading=size + 3,
+                )
             flow.append(
                 Paragraph(
                     f"<b>{_inline_markdown_to_rl(heading_match.group(2))}</b>",
@@ -1070,7 +1074,6 @@ MECHANICS_SEQUENCE = (
 
 # Named PDF pages for notebook preview (`build_pdf(..., pages="mechanics")`).
 PDF_PAGE_KEYS = (
-    "wellness",
     "mechanics",
     "batted_ball",
     "location",
@@ -1078,6 +1081,7 @@ PDF_PAGE_KEYS = (
     "flight_spray",
     "best_of_day",
     "other_visuals",
+    "wellness",
 )
 
 def _dash(val: Any) -> str:
@@ -2134,6 +2138,7 @@ def _notes_card(
     width: float,
     height: float,
     icon: bool = False,
+    heading_as_title: bool = False,
 ) -> _NotesCardBox:
     """Shaded notes card. Empty text still keeps the box + header."""
     empty_style = ParagraphStyle(
@@ -2146,7 +2151,13 @@ def _notes_card(
     )
     body = (text or "").strip()
     if body:
-        body_bits = _notes_flowables(body, styles, font_size=8, leading=10.5)
+        body_bits = _notes_flowables(
+            body,
+            styles,
+            font_size=8,
+            leading=10.5,
+            heading_as_title=heading_as_title,
+        )
         if not body_bits:
             body_bits = [Paragraph(escape(body).replace("\n", "<br/>"), empty_style)]
     else:
@@ -2619,18 +2630,15 @@ def _wellness_page_flow(
         charts = report_wellness.build_wellness_chart_images(block)
         bundle["_wellness_chart_images"] = charts
     n = int(block.get("n_checkins") or 0)
-    flow = _page1_header(
-        current=current,
-        bundle=bundle,
-        assessment_type=assessment_type,
-        styles=styles,
-        title="Hitting Assessment",
-        subtitle=(
-            "Wellness and readiness, swing mechanics, batted-ball results, "
-            "contact location, and Best of Day force metrics from this session."
-        ),
-        after_space=8,
-    )
+    flow = [
+        _section_chrome(
+            "Wellness & Readiness",
+            section,
+            subtitle="Self-reported check-ins for this training block.",
+            title_size=20,
+            after_space=8,
+        )
+    ]
     h_style = ParagraphStyle(
         "WqSec",
         parent=section,
@@ -2655,7 +2663,6 @@ def _wellness_page_flow(
         textColor=MUTED,
     )
 
-    flow.append(Paragraph("WELLNESS & READINESS", h_style))
     flow.append(_wellness_block_cards(block, styles))
     flow.append(Spacer(1, 6))
     banner = Table(
@@ -3078,20 +3085,6 @@ def _collect_story_pages(
 
     out: list[tuple[str, list]] = []
 
-    if _wants_page(wanted, "wellness"):
-        out.append(
-            (
-                "wellness",
-                _wellness_page_flow(
-                    current=current,
-                    bundle=bundle,
-                    assessment_type=assessment_type,
-                    styles=styles,
-                    section=section,
-                ),
-            )
-        )
-
     if _wants_page(wanted, "mechanics"):
         flow: list = []
         flow.extend(
@@ -3100,8 +3093,11 @@ def _collect_story_pages(
                 bundle=bundle,
                 assessment_type=assessment_type,
                 styles=styles,
-                title="Swing Mechanics",
-                subtitle="Movement sequence and mechanical notes",
+                title="Hitting Assessment",
+                subtitle=(
+                    "Swing mechanics, batted-ball results, contact location, "
+                    "and Best of Day force metrics from this session."
+                ),
                 after_space=12,
             )
         )
@@ -3521,8 +3517,9 @@ def _collect_story_pages(
             if has_metric:
                 kpi_blocks.append((spec["title"], cards))
         bod_summary = bundle.get("best_of_day_summary") or ""
-        flow = [
-            _section_chrome(
+
+        def _bod_chrome():
+            return _section_chrome(
                 "Best of Day Metrics",
                 section,
                 subtitle=(
@@ -3531,10 +3528,10 @@ def _collect_story_pages(
                 ),
                 after_space=6,
             )
-        ]
-        flow.append(Spacer(1, 4))
+
+        kpi_flow = [_bod_chrome(), Spacer(1, 4)]
         for title, cards in kpi_blocks:
-            flow.extend(
+            kpi_flow.extend(
                 _kpi_group_box(
                     title,
                     cards,
@@ -3545,16 +3542,18 @@ def _collect_story_pages(
                     previous_label=previous_label,
                 )
             )
-        flow.append(
-            _notes_card(
-                "OVERALL SUMMARY",
-                bod_summary,
-                styles,
-                width=PAGE_CONTENT_WIDTH,
-                height=0.75 * inch,
-            )
+        summary_card = _notes_card(
+            "BEST OF DAY METRICS OVERALL SUMMARY",
+            bod_summary,
+            styles,
+            width=PAGE_CONTENT_WIDTH,
+            height=0.75 * inch,
+            heading_as_title=True,
         )
         usable_h = 11 * inch - 0.5 * inch - 0.65 * inch
+        summary_overflows = len(bod_summary.strip()) > 700
+        if not summary_overflows:
+            kpi_flow.append(summary_card)
         out.append(
             (
                 "best_of_day",
@@ -3562,7 +3561,7 @@ def _collect_story_pages(
                     KeepInFrame(
                         PAGE_CONTENT_WIDTH,
                         usable_h,
-                        flow,
+                        kpi_flow,
                         mode="shrink",
                         hAlign="LEFT",
                         vAlign="TOP",
@@ -3570,6 +3569,22 @@ def _collect_story_pages(
                 ],
             )
         )
+        if summary_overflows:
+            out.append(
+                (
+                    "best_of_day",
+                    [
+                        KeepInFrame(
+                            PAGE_CONTENT_WIDTH,
+                            usable_h,
+                            [_bod_chrome(), Spacer(1, 4), summary_card],
+                            mode="shrink",
+                            hAlign="LEFT",
+                            vAlign="TOP",
+                        )
+                    ],
+                )
+            )
 
     caption_style = ParagraphStyle(
         "TrainerCaption",
@@ -3589,6 +3604,21 @@ def _collect_story_pages(
                 cells.append(cell)
         _append_image_grid(flow, cells, col_width=3.5 * inch)
         out.append(("other_visuals", flow))
+
+    is_retest = (current.get("assessment_type") or "").strip().lower() == "retest"
+    if is_retest and _wants_page(wanted, "wellness"):
+        out.append(
+            (
+                "wellness",
+                _wellness_page_flow(
+                    current=current,
+                    bundle=bundle,
+                    assessment_type=assessment_type,
+                    styles=styles,
+                    section=section,
+                ),
+            )
+        )
 
     return out
 

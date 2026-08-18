@@ -1260,6 +1260,7 @@ def lookup_player_directory_bio(conn, player_name: str, on_date: Any = None) -> 
     Missing table, columns, or row → empty strings printed as — on the PDF.
     """
     empty = {
+        "found": False,
         "height": None,
         "weight": None,
         "date_of_birth": None,
@@ -1319,11 +1320,62 @@ def lookup_player_directory_bio(conn, player_name: str, on_date: Any = None) -> 
         height = str(height).strip() or None
     if weight is not None:
         weight = str(weight).strip() or None
+    dob_out = None
+    if dob is not None and hasattr(dob, "strftime"):
+        dob_out = dob.strftime("%Y-%m-%d")
+    elif dob:
+        dob_out = str(dob).strip()[:10] or None
     return {
+        "found": True,
         "height": height,
         "weight": weight,
-        "date_of_birth": dob,
+        "date_of_birth": dob_out,
         "age_display": _format_age_years_months(dob, on_date),
+    }
+
+
+def peek_session_metrics(conn, player_name: str, assessment_date) -> dict[str, Any]:
+    """
+    Lightweight counts for the trainer form (tools checkboxes).
+
+    Always queries Blast / HitTrax / VALD for that player on the calendar
+    day, ignoring used_* flags so empty tools can be unchecked before submit.
+    """
+    start, end = _window_bounds({"assessment_date": assessment_date})
+    player = (player_name or "").strip()
+    blast = aggregate_blast(_blast_rows(conn, player, start, end))
+    hittrax = aggregate_hittrax(_hittrax_rows(conn, player, start, end))
+    vald = aggregate_vald(conn, player, start, end)
+    cmj = int(vald.get("cmj_trials") or 0)
+    sj = int(vald.get("sj_trials") or 0)
+    hj = int(vald.get("hj_trials") or 0)
+    imtp = int(vald.get("imtp_trials") or 0)
+    vald_n = cmj + sj + hj + imtp
+    blast_n = int(blast.get("swing_count") or 0)
+    hittrax_n = int(hittrax.get("swing_count") or 0)
+    return {
+        "player_name": player,
+        "assessment_date": _as_date(assessment_date).isoformat(),
+        "blast": {
+            "found": blast_n > 0,
+            "swing_count": blast_n,
+            "peak_bat_speed": blast.get("peak_bat_speed"),
+            "avg_bat_speed": blast.get("avg_bat_speed"),
+        },
+        "hittrax": {
+            "found": hittrax_n > 0,
+            "contact_count": hittrax_n,
+            "peak_ev": hittrax.get("peak_ev"),
+            "avg_ev": hittrax.get("avg_ev"),
+        },
+        "vald": {
+            "found": vald_n > 0,
+            "trial_count": vald_n,
+            "cmj_trials": cmj,
+            "sj_trials": sj,
+            "hj_trials": hj,
+            "imtp_trials": imtp,
+        },
     }
 
 

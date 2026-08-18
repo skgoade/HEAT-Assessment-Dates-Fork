@@ -130,6 +130,47 @@
             margin-top: 6px;
         }
 
+        .notes-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .notes-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .notes-toolbar button {
+            width: auto;
+            min-width: 36px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            border: 1px solid rgba(252, 186, 57, 0.35);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .notes-toolbar button:hover,
+        .notes-toolbar button:focus {
+            border-color: #fcba39;
+            background: rgba(252, 186, 57, 0.16);
+            outline: none;
+        }
+
+        .notes-toolbar .notes-bold {
+            font-weight: 800;
+        }
+
+        .notes-toolbar .notes-italic {
+            font-style: italic;
+        }
+
         button[type="submit"] {
             width: 100%;
             padding: 16px;
@@ -218,8 +259,32 @@
             text-align: left;
         }
 
+        .visual-row .visual-caption {
+            min-height: 72px;
+            overflow: hidden;
+            resize: vertical;
+        }
+
         .visual-row .visual-caption::placeholder {
             text-align: left;
+        }
+
+        .visual-preview {
+            width: 100%;
+            max-width: 168px;
+            aspect-ratio: 130 / 185;
+            background: #0f1720;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .visual-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
         }
 
         .visual-row .visual-order {
@@ -260,16 +325,17 @@
             margin-bottom: 8px;
         }
 
-            .mechanics-phase-status {
-                margin: 0 0 10px;
-            }
+        .mechanics-phase-status {
+            margin: 0 0 10px;
+        }
 
-            .mechanics-phase-notes {
+        .mechanics-phase-notes {
             width: 100%;
-            min-height: 56px;
+            min-height: 72px;
             margin: 0 0 10px;
             box-sizing: border-box;
             resize: vertical;
+            overflow: hidden;
         }
 
         .mechanics-phase-files {
@@ -296,6 +362,12 @@
             object-position: center;
             display: block;
         }
+
+        .mechanics-remove-photo,
+        .visual-remove-photo {
+            align-self: flex-start;
+            padding: 6px 12px;
+            font-size: 13px;
         }
 
         .mechanics-photo-row {
@@ -406,9 +478,111 @@
 
         .tool-options {
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px 24px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .tool-option {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .tool-option > span:first-child {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tool-peek {
+            font-size: 12px;
+            line-height: 1.35;
+            color: rgba(255, 255, 255, 0.68);
+            padding-left: 26px;
+        }
+
+        .tool-peek.is-found {
+            color: #8dffb0;
+        }
+
+        .tool-peek.is-empty {
+            color: #ff8a8a;
+        }
+
+        .tool-peek.is-loading,
+        .tool-peek.is-idle {
+            color: rgba(255, 255, 255, 0.55);
+        }
+
+        .player-bio-peek {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(252, 186, 57, 0.16);
+        }
+
+        .player-bio-peek-kicker {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(252, 186, 57, 0.85);
+            margin-bottom: 8px;
+        }
+
+        .player-bio-peek-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .player-bio-peek-cell.is-wide {
+            grid-column: span 3;
+        }
+
+        .player-bio-peek-cell.is-bio {
+            grid-column: span 2;
+        }
+
+        .player-bio-peek-cell span {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 2px;
+        }
+
+        .player-bio-peek-cell strong {
+            font-size: 14px;
+            font-weight: 650;
+            color: #ffffff;
+        }
+
+        .player-bio-peek-note {
+            font-size: 12px;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.62);
+        }
+
+        .player-bio-peek-grid + .player-bio-peek-note {
             margin-top: 8px;
+        }
+
+        .player-bio-peek.is-found .player-bio-peek-cell strong {
+            color: #8dffb0;
+        }
+
+        .player-bio-peek.is-empty .player-bio-peek-note {
+            color: #ff8a8a;
+        }
+
+        .player-bio-peek.is-loading .player-bio-peek-note,
+        .player-bio-peek.is-idle .player-bio-peek-note {
+            color: rgba(255, 255, 255, 0.55);
         }
 
         .tool-options label {
@@ -639,6 +813,179 @@
                 width: 150px;
                 height: 90px;
             }
+
+            .player-bio-peek-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .player-bio-peek-cell.is-wide,
+            .player-bio-peek-cell.is-bio {
+                grid-column: auto;
+            }
+        }
+
+        .mode-status {
+            margin-top: 12px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .mode-status[hidden] {
+            display: none !important;
+        }
+
+        .mode-change-btn {
+            margin-left: 10px;
+            padding: 4px 10px;
+            background: transparent;
+            color: #fcba39;
+            border: 1px solid rgba(252, 186, 57, 0.5);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .mode-change-btn:hover {
+            background: rgba(252, 186, 57, 0.12);
+        }
+
+        .mode-chooser {
+            margin-bottom: 8px;
+        }
+
+        .mode-chooser[hidden],
+        #assessmentForm[hidden],
+        .regen-section[hidden],
+        .wizard-step[hidden] {
+            display: none !important;
+        }
+
+        .mode-chooser-copy {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .mode-choice-btn {
+            width: 100%;
+            padding: 18px 16px;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #ffffff;
+            border: 2px solid rgba(252, 186, 57, 0.35);
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            text-align: left;
+        }
+
+        .mode-choice-btn span {
+            display: block;
+            margin-top: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .mode-choice-btn:hover {
+            border-color: #fcba39;
+            background: rgba(252, 186, 57, 0.12);
+        }
+
+        .section-intro {
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .wizard-dots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .wizard-dot {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 8px 6px;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .wizard-dot[aria-current="step"] {
+            color: #111521;
+            background: #fcba39;
+            border-color: #fcba39;
+        }
+
+        .wizard-dot.is-done {
+            color: #fcba39;
+            border-color: rgba(252, 186, 57, 0.5);
+        }
+
+        .wizard-nav {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+            position: sticky;
+            bottom: 0;
+            padding: 12px 0 4px;
+            background: linear-gradient(180deg, rgba(17, 21, 33, 0) 0%, rgba(17, 21, 33, 0.92) 18%, rgba(17, 21, 33, 0.97) 100%);
+        }
+
+        .wizard-nav .secondary-btn,
+        .wizard-nav .wizard-next {
+            width: auto;
+            flex: 0 0 auto;
+            margin-top: 0;
+            padding: 12px 16px;
+            font-size: 15px;
+        }
+
+        .wizard-next {
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #fcba39 0%, #f0a020 100%);
+            color: #111521;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .wizard-next:hover {
+            box-shadow: 0 4px 15px rgba(252, 186, 57, 0.3);
+        }
+
+        .wizard-next[hidden] {
+            display: none !important;
+        }
+
+        .wizard-step-label {
+            flex: 1 1 auto;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .wizard-step-title {
+            color: #fcba39;
+            font-size: 18px;
+            margin-bottom: 8px;
         }
 
         .spinner {
@@ -666,348 +1013,434 @@
             </div>
             <h1>Hitting Assessment</h1>
             <p class="subtitle">Record player assessment data for automated reporting</p>
+            <p id="modeStatus" class="mode-status" hidden>
+                <span id="modeStatusLabel"></span>
+                <button type="button" class="mode-change-btn" id="changeModeBtn">Change</button>
+            </p>
         </div>
 
-        <div class="info-box">
-            <div class="info-box-title">Assessment Information</div>
-            <div class="info-box-content">
-                Enter the athlete name. If they’ve tested before, we’ll show prior dates so you can
-                confirm which one to compare against. Metrics use that assessment calendar day only
-                (Blast, HitTrax, and VALD). After submit, a draft PDF is generated automatically.
-            </div>
+        <div id="modeChooser" class="mode-chooser">
+            <p class="mode-chooser-copy">
+                Start a <strong>new assessment</strong> after a session to build the first PDF,
+                or <strong>regenerate</strong> an existing one to update notes, photos, tools, or the video link.
+                Metrics use that assessment calendar day only (Blast, HitTrax, and VALD).
+            </p>
+            <button type="button" class="mode-choice-btn" id="chooseCreateBtn">
+                Submit a new assessment
+                <span>First PDF for this session — player, date, notes, and photos.</span>
+            </button>
+            <button type="button" class="mode-choice-btn" id="chooseRegenBtn">
+                Regenerate an existing PDF
+                <span>Find a saved assessment, edit, and rebuild without creating a new one.</span>
+            </button>
         </div>
 
         <div id="message" class="message"></div>
 
-        <form id="assessmentForm">
-            <div class="form-group">
-                <label for="playerName">
-                    Player Name<span class="required">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    id="playerName" 
-                    name="playerName" 
-                    required
-                    placeholder="Enter player name"
-                    list="playerNames"
-                    autocomplete="off"
-                >
-                <datalist id="playerNames"></datalist>
-                <div class="helper-text">Full name of the player being assessed</div>
-                <div id="lookupStatus" class="lookup-status"></div>
-            </div>
+        <form id="assessmentForm" hidden novalidate>
+            <div class="wizard-dots" id="createProgress" role="tablist" aria-label="New assessment steps"></div>
 
-            <div id="typePanel" class="type-panel" aria-live="polite">
-                <span id="typeBadge" class="type-badge">—</span>
-                <p id="typeCopy"></p>
-                <div id="previousGroup" class="form-group" style="margin-top: 16px; margin-bottom: 0; display: none;">
-                    <label for="previousAssessmentId">
-                        Previous assessment to compare<span class="required">*</span>
-                    </label>
-                    <select id="previousAssessmentId" name="previousAssessmentId">
-                    </select>
-                    <div class="helper-text">
-                        Defaults to the most recent. Baseline (earliest Initial) is resolved automatically for the PDF.
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="assessmentDate">
-                    Assessment Date<span class="required">*</span>
-                </label>
-                <input 
-                    type="date" 
-                    id="assessmentDate" 
-                    name="assessmentDate" 
-                    required
-                >
-                <div class="helper-text">Date when the assessment was conducted</div>
-            </div>
-
-            <div class="form-group">
-                <label for="trainerName">
-                    Trainer Name
-                </label>
-                <input 
-                    type="text" 
-                    id="trainerName" 
-                    name="trainerName" 
-                    placeholder="Enter trainer name"
-                    list="trainerNames"
-                    autocomplete="off"
-                >
-                <datalist id="trainerNames"></datalist>
-                <div class="helper-text">Name of the trainer conducting the assessment (optional)</div>
-            </div>
-
-            <div class="form-group">
-                <label>Tools used</label>
-                <div class="tool-options">
-                    <label><input type="checkbox" id="usedBlast" checked> Blast Motion</label>
-                    <label><input type="checkbox" id="usedHittrax" checked> HitTrax</label>
-                    <label><input type="checkbox" id="usedVald" checked> VALD</label>
-                </div>
-                <div class="helper-text">
-                    Unchecked tools and their associated visuals are omitted from the PDF.
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="videoAnalysisUrl">
-                    Video Analysis Link
-                </label>
-                <input
-                    type="url"
-                    id="videoAnalysisUrl"
-                    name="videoAnalysisUrl"
-                    placeholder="https://youtu.be/..."
-                    autocomplete="off"
-                >
-                <div class="helper-text">
-                    Optional link to Blast/video analysis (shown on the PDF header)
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="mechanicalSummary">Mechanical Observation</label>
-                <textarea
-                    id="mechanicalSummary"
-                    name="mechanicalSummary"
-                    placeholder="Overall mechanical takeaways for this session..."
-                ></textarea>
-                <div class="helper-text">
-                    Page 1, left card.
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="trainingFocus">Training Focus</label>
-                <textarea
-                    id="trainingFocus"
-                    name="trainingFocus"
-                    placeholder="- Eliminate sway in the load&#10;- Get the barrel on time"
-                ></textarea>
-                <div class="helper-text">
-                    Page 1, right card. Use <code>- bullets</code> if you want a list.
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="notes">
-                    Assessment Notes
-                </label>
-                <textarea 
-                    id="notes" 
-                    name="notes"
-                    placeholder="Short session notes (shown under the two cards on page 1)..."
-                ></textarea>
-                <div class="helper-text">
-                    Page 1, bottom strip. Supports basic Markdown:
-                    <code>**bold**</code>, <code>*italic*</code>,
-                    <code>`code`</code>, <code>- bullets</code>.
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="bestOfDaySummary">Best of Day Summary (optional)</label>
-                <textarea
-                    id="bestOfDaySummary"
-                    name="bestOfDaySummary"
-                    placeholder="One overall note on jump / hop / pull tests..."
-                ></textarea>
-                <div class="helper-text">
-                    Printed in the Overall Summary box under Best of Day Metrics.
-                    Leave blank to keep the empty box.
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Mechanics phase cards (optional)</label>
-                <p class="section-intro" style="margin: 0 0 12px;">
-                    One card per swing phase (Load Phase → Impact). Choose Strength /
-                    Monitor / Development, add a caption, and attach <strong>one photo</strong>
-                    per phase. PNG/JPEG/WebP, up to 4&nbsp;MB each. Photos are shown in a
-                    fixed portrait frame on the PDF (center-cropped to match).
+            <div class="wizard-step" data-step="0">
+                <h2 class="wizard-step-title">Athlete</h2>
+                <p class="section-intro" style="margin: 0 0 16px;">
+                    If they’ve tested before, we’ll show prior dates so you can confirm which one to compare against.
                 </p>
-                <div id="mechanicsRows"></div>
-            </div>
-
-            <div class="form-group">
-                <label>Other trainer visuals (optional)</label>
-                <p class="section-intro" style="margin: 0 0 12px;">
-                    Extra screenshots (HitTrax/VALD exports, etc.).
-                    Use ↑ ↓ for PDF order among these extras (top = first).
-                    PNG/JPEG/WebP, up to 4&nbsp;MB each, max 6.
-                </p>
-                <div id="visualRows"></div>
-                <button type="button" class="secondary-btn" id="addVisualBtn" style="margin-top: 8px;">
-                    + Add image
-                </button>
-            </div>
-
-            <button type="submit" id="submitBtn">
-                Submit Assessment
-            </button>
-        </form>
-
-        <hr class="divider">
-
-        <section class="regen-section" aria-labelledby="regenHeading">
-            <h2 id="regenHeading">Regenerate PDF</h2>
-            <p class="section-intro">
-                Find an existing assessment by ID or by player + assessment number, then refresh the PDF.
-                You can also update notes, tools, and visuals here before generating.
-            </p>
-            <div class="form-group">
-                <label>Find assessment by</label>
-                <div class="regen-mode-options">
-                    <label>
-                        <input type="radio" name="regenLookupMode" value="id" checked>
-                        Assessment ID
-                    </label>
-                    <label>
-                        <input type="radio" name="regenLookupMode" value="player">
-                        Player name + assessment number
-                    </label>
-                </div>
-            </div>
-            <div id="regenByIdPanel" class="regen-lookup-panel">
                 <div class="form-group">
-                    <label for="regenAssessmentId">
-                        Assessment ID<span class="required">*</span>
-                    </label>
-                    <input
-                        type="text"
-                        id="regenAssessmentId"
-                        inputmode="numeric"
-                        pattern="[0-9]*"
-                        placeholder="e.g. 3"
-                        autocomplete="off"
-                    >
-                    <div class="helper-text">From a prior submit success message or the database</div>
-                </div>
-            </div>
-            <div id="regenByPlayerPanel" class="regen-lookup-panel" hidden>
-                <div class="form-group">
-                    <label for="regenPlayerName">
+                    <label for="playerName">
                         Player Name<span class="required">*</span>
                     </label>
                     <input
                         type="text"
-                        id="regenPlayerName"
+                        id="playerName"
+                        name="playerName"
                         placeholder="Enter player name"
                         list="playerNames"
                         autocomplete="off"
                     >
+                    <datalist id="playerNames"></datalist>
+                    <div class="helper-text">Full name of the player being assessed</div>
+                    <div id="lookupStatus" class="lookup-status"></div>
+                    <div class="player-bio-peek is-idle" id="playerBioPeek">
+                        <div class="player-bio-peek-note">
+                            Enter a player name to preview height, weight, and age from the player directory (same values as the PDF header).
+                        </div>
+                    </div>
+                </div>
+
+                <div id="typePanel" class="type-panel" aria-live="polite">
+                    <span id="typeBadge" class="type-badge">—</span>
+                    <p id="typeCopy"></p>
+                    <div id="previousGroup" class="form-group" style="margin-top: 16px; margin-bottom: 0; display: none;">
+                        <label for="previousAssessmentId">
+                            Previous assessment to compare<span class="required">*</span>
+                        </label>
+                        <select id="previousAssessmentId" name="previousAssessmentId">
+                        </select>
+                        <div class="helper-text">
+                            Defaults to the most recent. Baseline (earliest Initial) is resolved automatically for the PDF.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="assessmentDate">
+                        Assessment Date<span class="required">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        id="assessmentDate"
+                        name="assessmentDate"
+                    >
+                    <div class="helper-text">Date when the assessment was conducted</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="trainerName">
+                        Trainer Name
+                    </label>
+                    <input
+                        type="text"
+                        id="trainerName"
+                        name="trainerName"
+                        placeholder="Enter trainer name"
+                        list="trainerNames"
+                        autocomplete="off"
+                    >
+                    <datalist id="trainerNames"></datalist>
+                    <div class="helper-text">Name of the trainer conducting the assessment (optional)</div>
+                </div>
+            </div>
+
+            <div class="wizard-step" data-step="1" hidden>
+                <h2 class="wizard-step-title">Session</h2>
+                <div class="form-group">
+                    <label>Tools used</label>
+                    <div class="tool-options">
+                        <div class="tool-option">
+                            <span><label><input type="checkbox" id="usedBlast" checked> Blast Motion</label></span>
+                            <div class="tool-peek is-idle" id="usedBlastPeek">Counts load after player and date are set.</div>
+                        </div>
+                        <div class="tool-option">
+                            <span><label><input type="checkbox" id="usedHittrax" checked> HitTrax</label></span>
+                            <div class="tool-peek is-idle" id="usedHittraxPeek">Counts load after player and date are set.</div>
+                        </div>
+                        <div class="tool-option">
+                            <span><label><input type="checkbox" id="usedVald" checked> VALD</label></span>
+                            <div class="tool-peek is-idle" id="usedValdPeek">Counts load after player and date are set.</div>
+                        </div>
+                    </div>
+                    <div class="helper-text">
+                        Peek shows what is in the database for this player on the assessment date.
+                        Uncheck a tool to omit it from the PDF.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="videoAnalysisUrl">
+                        Video Analysis Link
+                    </label>
+                    <input
+                        type="url"
+                        id="videoAnalysisUrl"
+                        name="videoAnalysisUrl"
+                        placeholder="https://youtu.be/..."
+                        autocomplete="off"
+                    >
+                    <div class="helper-text">
+                        Optional link to Blast/video analysis (shown on the PDF header)
+                    </div>
+                </div>
+            </div>
+
+            <div class="wizard-step" data-step="2" hidden>
+                <h2 class="wizard-step-title">Swing photos</h2>
+                <div class="form-group">
+                    <label>Mechanics phase cards (optional)</label>
+                    <p class="section-intro" style="margin: 0 0 12px;">
+                        One card per swing phase (Load Phase → Impact). Choose Strength /
+                        Monitor / Development, add a caption, and attach <strong>one photo</strong>
+                        per phase. PNG/JPEG/WebP, up to 4&nbsp;MB each. Photos are shown in a
+                        fixed portrait frame on the PDF (center-cropped to match).
+                    </p>
+                    <div id="mechanicsRows"></div>
+                </div>
+            </div>
+
+            <div class="wizard-step" data-step="3" hidden>
+                <h2 class="wizard-step-title">Extra images</h2>
+                <div class="form-group">
+                    <label>Other trainer visuals (optional)</label>
+                    <p class="section-intro" style="margin: 0 0 12px;">
+                        Extra screenshots (HitTrax/VALD exports, etc.).
+                        Use ↑ ↓ for PDF order among these extras (top = first).
+                        PNG/JPEG/WebP, up to 4&nbsp;MB each, max 6.
+                    </p>
+                    <div id="visualRows"></div>
+                    <button type="button" class="secondary-btn" id="addVisualBtn" style="margin-top: 8px;">
+                        + Add image
+                    </button>
+                </div>
+
+            </div>
+
+            <div class="wizard-step" data-step="4" hidden>
+                <h2 class="wizard-step-title">Notes</h2>
+                <div class="form-group">
+                    <label for="mechanicalSummary">Mechanical Observation</label>
+                    <textarea
+                        id="mechanicalSummary"
+                        name="mechanicalSummary"
+                        class="notes-field"
+                        placeholder="Overall mechanical takeaways for this session..."
+                    ></textarea>
+                    <div class="helper-text">
+                        Page 1, left card.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="trainingFocus">Training Focus</label>
+                    <textarea
+                        id="trainingFocus"
+                        name="trainingFocus"
+                        class="notes-field"
+                        placeholder="Eliminate sway in the load"
+                    ></textarea>
+                    <div class="helper-text">
+                        Page 1, right card.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">
+                        Assessment Notes
+                    </label>
+                    <textarea
+                        id="notes"
+                        name="notes"
+                        class="notes-field"
+                        placeholder="Short session notes (shown under the two cards on page 1)..."
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="bestOfDaySummary">Best of Day Summary</label>
+                    <textarea
+                        id="bestOfDaySummary"
+                        name="bestOfDaySummary"
+                        class="notes-field"
+                        placeholder="One overall note on jump / hop / pull tests..."
+                    ></textarea>
+                    <div class="helper-text">
+                        Printed in the Overall Summary box under Best of Day Metrics.
+                    </div>
+                </div>
+            
+                <button type="submit" id="submitBtn">
+                    Submit Assessment
+                </button>
+
+            </div>
+
+            <div class="wizard-nav" id="createWizardNav">
+                <button type="button" class="secondary-btn" id="createPrevBtn">Previous</button>
+                <span class="wizard-step-label" id="createStepLabel"></span>
+                <button type="button" class="wizard-next" id="createNextBtn">Next</button>
+            </div>
+        </form>
+
+        <section class="regen-section" id="regenSection" aria-labelledby="regenHeading" hidden>
+            <h2 id="regenHeading">Regenerate PDF</h2>
+            <div class="wizard-dots" id="regenProgress" role="tablist" aria-label="Regenerate steps"></div>
+
+            <div class="wizard-step" data-step="0">
+                <h2 class="wizard-step-title">Find assessment</h2>
+                <p class="section-intro">
+                    Find an existing assessment by ID or by player + assessment number.
+                    Notes, tools, and images load automatically once it is selected.
+                </p>
+                <div class="form-group">
+                    <label>Find assessment by</label>
+                    <div class="regen-mode-options">
+                        <label>
+                            <input type="radio" name="regenLookupMode" value="id" checked>
+                            Assessment ID
+                        </label>
+                        <label>
+                            <input type="radio" name="regenLookupMode" value="player">
+                            Player name + assessment number
+                        </label>
+                    </div>
+                </div>
+                <div id="regenByIdPanel" class="regen-lookup-panel">
+                    <div class="form-group">
+                        <label for="regenAssessmentId">
+                            Assessment ID<span class="required">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="regenAssessmentId"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="e.g. 3"
+                            autocomplete="off"
+                        >
+                        <div class="helper-text">From a prior submit success message or the database</div>
+                    </div>
+                </div>
+                <div id="regenByPlayerPanel" class="regen-lookup-panel" hidden>
+                    <div class="form-group">
+                        <label for="regenPlayerName">
+                            Player Name<span class="required">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="regenPlayerName"
+                            placeholder="Enter player name"
+                            list="playerNames"
+                            autocomplete="off"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="regenVisit">
+                            Assessment<span class="required">*</span>
+                        </label>
+                        <select id="regenVisit" disabled>
+                            <option value="">Look up a player first</option>
+                        </select>
+                        <div id="regenLookupStatus" class="helper-text"></div>
+                    </div>
+                </div>
+                <div class="player-bio-peek is-idle" id="regenPlayerBioPeek">
+                    <div class="player-bio-peek-note">
+                        Height, weight, and age from the player directory appear here once a player is identified.
+                    </div>
+                </div>
+            </div>
+
+            <div class="wizard-step" data-step="1" hidden>
+                <h2 class="wizard-step-title">Session</h2>
+                <div class="form-group">
+                    <label>Tools used</label>
+                    <div class="tool-options">
+                        <div class="tool-option">
+                            <span><label><input type="checkbox" id="regenUsedBlast" checked> Blast Motion</label></span>
+                            <div class="tool-peek is-idle" id="regenUsedBlastPeek">Counts load after an assessment is selected.</div>
+                        </div>
+                        <div class="tool-option">
+                            <span><label><input type="checkbox" id="regenUsedHittrax" checked> HitTrax</label></span>
+                            <div class="tool-peek is-idle" id="regenUsedHittraxPeek">Counts load after an assessment is selected.</div>
+                        </div>
+                        <div class="tool-option">
+                            <span><label><input type="checkbox" id="regenUsedVald" checked> VALD</label></span>
+                            <div class="tool-peek is-idle" id="regenUsedValdPeek">Counts load after an assessment is selected.</div>
+                        </div>
+                    </div>
+                    <div class="helper-text">
+                        Peek shows database rows for this player on the assessment date.
+                        Uncheck a tool with no data so empty pages are omitted from the PDF.
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="regenVisit">
-                        Assessment<span class="required">*</span>
-                    </label>
-                    <select id="regenVisit" disabled>
-                        <option value="">Look up a player first</option>
-                    </select>
-                    <div id="regenLookupStatus" class="helper-text"></div>
+                    <label for="regenVideoUrl">Video Analysis Link</label>
+                    <input
+                        type="url"
+                        id="regenVideoUrl"
+                        placeholder="https://youtu.be/..."
+                        autocomplete="off"
+                    >
                 </div>
             </div>
-            <div class="form-group">
-                <label>Tools used</label>
-                <div class="tool-options">
-                    <label><input type="checkbox" id="regenUsedBlast" checked> Blast Motion</label>
-                    <label><input type="checkbox" id="regenUsedHittrax" checked> HitTrax</label>
-                    <label><input type="checkbox" id="regenUsedVald" checked> VALD</label>
+
+            <div class="wizard-step" data-step="2" hidden>
+                <h2 class="wizard-step-title">Images</h2>
+                <div class="form-group">
+                    <label>Mechanics phase cards (optional)</label>
+                    <p class="section-intro" style="margin: 0 0 12px;">
+                        Existing photos load into each phase card. Choose a file to replace,
+                        or remove the photo. Captions stay in the box on the card.
+                        PNG/JPEG/WebP, up to 4&nbsp;MB each, one photo per phase.
+                    </p>
+                    <button type="button" class="secondary-btn" id="loadAttachmentsBtn">
+                        Reload saved images
+                    </button>
+                    <div id="regenMechanicsRows"></div>
+                </div>
+                <div class="form-group">
+                    <label>Other visuals (optional)</label>
+                    <p class="section-intro" style="margin: 0 0 12px;">
+                        Existing extras load here with preview, caption, and remove.
+                        Use ↑ ↓ to set PDF order among extras.
+                        PNG/JPEG/WebP, up to 4&nbsp;MB each, max 6.
+                    </p>
+                    <div id="regenVisualRows"></div>
+                    <button type="button" class="secondary-btn" id="regenAddVisualBtn" style="margin-top: 8px;">
+                        + Add image
+                    </button>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="regenVideoUrl">Video Analysis Link</label>
-                <input
-                    type="url"
-                    id="regenVideoUrl"
-                    placeholder="https://youtu.be/..."
-                    autocomplete="off"
-                >
-            </div>
-            <div class="form-group">
-                <label for="regenMechanicalSummary">Mechanical Observation</label>
-                <textarea
-                    id="regenMechanicalSummary"
-                    placeholder="Overall mechanical takeaways for this session..."
-                ></textarea>
-            </div>
-            <div class="form-group">
-                <label for="regenTrainingFocus">Training Focus</label>
-                <textarea
-                    id="regenTrainingFocus"
-                    placeholder="- Eliminate sway in the load"
-                ></textarea>
-            </div>
-            <div class="form-group">
-                <label for="regenNotes">Assessment Notes</label>
-                <textarea
-                    id="regenNotes"
-                    placeholder="Short session notes for page 1..."
-                ></textarea>
-                <div class="helper-text">
-                    Load the assessment below to view saved notes. Page 1 bottom strip.
+
+            <div class="wizard-step" data-step="3" hidden>
+                <h2 class="wizard-step-title">Notes</h2>
+                <div class="form-group">
+                    <label for="regenMechanicalSummary">Mechanical Observation</label>
+                    <textarea
+                        id="regenMechanicalSummary"
+                        class="notes-field"
+                        placeholder="Overall mechanical takeaways for this session..."
+                    ></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="regenTrainingFocus">Training Focus</label>
+                    <textarea
+                        id="regenTrainingFocus"
+                        class="notes-field"
+                        placeholder="Eliminate sway in the load"
+                    ></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="regenNotes">Assessment Notes</label>
+                    <textarea
+                        id="regenNotes"
+                        class="notes-field"
+                        placeholder="Short session notes for page 1..."
+                    ></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="regenBestOfDaySummary">Best of Day Summary</label>
+                    <textarea
+                        id="regenBestOfDaySummary"
+                        class="notes-field"
+                        placeholder="One overall note on jump / hop / pull tests..."
+                    ></textarea>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="regenBestOfDaySummary">Best of Day Summary (optional)</label>
-                <textarea
-                    id="regenBestOfDaySummary"
-                    placeholder="One overall note on jump / hop / pull tests..."
-                ></textarea>
-            </div>
-            <div class="form-group">
-                <label>Images already attached</label>
-                <p class="section-intro" style="margin: 0 0 12px;">
-                    Notes, tools, and images load automatically once an assessment is
-                    selected above. Check any image to remove it. Each swing phase keeps
-                    one photo on the PDF (first by sort order).
-                </p>
-                <button type="button" class="secondary-btn" id="loadAttachmentsBtn">
-                    Reload from saved assessment
+
+            <div class="wizard-step" data-step="4" hidden>
+                <h2 class="wizard-step-title">Generate</h2>
+                <div class="form-group">
+                    <label>PDF version history</label>
+                    <p class="section-intro" style="margin: 0 0 12px;">
+                        Each generate keeps prior PDFs. Download any version from the list below.
+                    </p>
+                    <div id="reportVersions" class="existing-attachments"></div>
+                </div>
+                <button type="button" class="secondary-btn" id="regenBtn">
+                    Generate PDF
                 </button>
-                <div id="existingAttachments" class="existing-attachments"></div>
+                <div id="regenMessage" class="message" style="margin-top: 16px;"></div>
             </div>
-            <div class="form-group">
-                <label>Mechanics phase cards (optional)</label>
-                <p class="section-intro" style="margin: 0 0 12px;">
-                    Status, caption, and one new photo per phase. If a phase already has
-                    a photo, remove it above before uploading a replacement.
-                </p>
-                <div id="regenMechanicsRows"></div>
+
+            <div class="wizard-nav" id="regenWizardNav">
+                <button type="button" class="secondary-btn" id="regenPrevBtn">Previous</button>
+                <span class="wizard-step-label" id="regenStepLabel"></span>
+                <button type="button" class="wizard-next" id="regenNextBtn">Next</button>
             </div>
-            <div class="form-group">
-                <label>Other visuals (optional)</label>
-                <p class="section-intro" style="margin: 0 0 12px;">
-                    Use ↑ ↓ to set PDF order among extras.
-                    PNG/JPEG/WebP, up to 4&nbsp;MB each, max 6.
-                </p>
-                <div id="regenVisualRows"></div>
-                <button type="button" class="secondary-btn" id="regenAddVisualBtn" style="margin-top: 8px;">
-                    + Add image
-                </button>
-            </div>
-            <div class="form-group">
-                <label>PDF version history</label>
-                <p class="section-intro" style="margin: 0 0 12px;">
-                    Each generate keeps prior PDFs. Download any version from the list below.
-                </p>
-                <div id="reportVersions" class="existing-attachments"></div>
-            </div>
-            <button type="button" class="secondary-btn" id="regenBtn">
-                Generate PDF
-            </button>
-            <div id="regenMessage" class="message" style="margin-top: 16px;"></div>
         </section>
     </div>
 
-    <!-- LOCAL TESTING: uncomment the next line, then open this file in a browser.
+    <!-- LOCAL TESTING: comment this script out before publishing the form. -->
     <script>window.HEAT_API_BASE = 'http://localhost:8080';</script>
-    -->
 
     <script>
         // Production Cloud Run (heat-assessment-api).
@@ -1033,6 +1466,34 @@
         const mechanicsRowsEl = document.getElementById('mechanicsRows');
         const regenMechanicsRowsEl = document.getElementById('regenMechanicsRows');
         let regenPhaseNotesDirty = false;
+        let regenPendingDeleteIds = new Set();
+
+        function autosizeTextarea(el) {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+        }
+
+        function clearPreviewImage(img) {
+            if (!img) return;
+            if (img.dataset.objectUrl) {
+                URL.revokeObjectURL(img.dataset.objectUrl);
+                delete img.dataset.objectUrl;
+            }
+            img.removeAttribute('src');
+        }
+
+        function setPreviewImage(preview, img, url, { objectUrl = false } = {}) {
+            clearPreviewImage(img);
+            if (!preview || !img) return;
+            if (!url) {
+                preview.hidden = true;
+                return;
+            }
+            if (objectUrl) img.dataset.objectUrl = url;
+            img.src = url;
+            preview.hidden = false;
+        }
 
         function refreshVisualOrderLabels(container) {
             container.querySelectorAll('.visual-row').forEach((row, idx) => {
@@ -1081,13 +1542,16 @@
                         <option value="monitor">Monitor</option>
                         <option value="development">Development</option>
                     </select>
-                    <textarea class="mechanics-phase-notes" rows="2"
+                    <textarea class="mechanics-phase-notes"
                         placeholder="Caption / cues for this phase (optional)"></textarea>
                     <div class="mechanics-phase-files">
                         <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
                         <div class="mechanics-phase-preview" hidden>
                             <img alt="Phase photo preview">
                         </div>
+                        <button type="button" class="secondary-btn mechanics-remove-photo" hidden>
+                            Remove photo
+                        </button>
                     </div>
                 `;
                 const statusEl = card.querySelector('.mechanics-phase-status');
@@ -1096,37 +1560,80 @@
                     statusEl.value = entry.status;
                 }
                 notesEl.value = entry.caption;
+                autosizeTextarea(notesEl);
                 const markDirty = () => {
                     if (container === regenMechanicsRowsEl) {
                         regenPhaseNotesDirty = true;
                     }
                 };
                 statusEl.addEventListener('change', markDirty);
-                notesEl.addEventListener('input', markDirty);
+                notesEl.addEventListener('input', () => {
+                    markDirty();
+                    autosizeTextarea(notesEl);
+                });
                 const fileInput = card.querySelector('.visual-file');
                 const preview = card.querySelector('.mechanics-phase-preview');
                 const previewImg = preview.querySelector('img');
+                const removeBtn = card.querySelector('.mechanics-remove-photo');
                 fileInput.addEventListener('change', () => {
                     const file = fileInput.files && fileInput.files[0];
-                    if (previewImg.dataset.objectUrl) {
-                        URL.revokeObjectURL(previewImg.dataset.objectUrl);
-                        delete previewImg.dataset.objectUrl;
-                    }
                     if (!file) {
-                        preview.hidden = true;
-                        previewImg.removeAttribute('src');
+                        if (card.dataset.attachmentId) {
+                            setPreviewImage(preview, previewImg, card.dataset.fileUrl || '');
+                            removeBtn.hidden = false;
+                        } else {
+                            setPreviewImage(preview, previewImg, null);
+                            removeBtn.hidden = true;
+                        }
                         return;
                     }
-                    const url = URL.createObjectURL(file);
-                    previewImg.dataset.objectUrl = url;
-                    previewImg.src = url;
-                    preview.hidden = false;
+                    if (card.dataset.attachmentId) {
+                        regenPendingDeleteIds.add(String(card.dataset.attachmentId));
+                    }
+                    setPreviewImage(preview, previewImg, URL.createObjectURL(file), { objectUrl: true });
+                    removeBtn.hidden = false;
+                });
+                removeBtn.addEventListener('click', () => {
+                    if (card.dataset.attachmentId) {
+                        regenPendingDeleteIds.add(String(card.dataset.attachmentId));
+                        delete card.dataset.attachmentId;
+                        delete card.dataset.fileUrl;
+                    }
+                    fileInput.value = '';
+                    setPreviewImage(preview, previewImg, null);
+                    removeBtn.hidden = true;
+                    markDirty();
                 });
                 container.appendChild(card);
             });
         }
 
-        function addVisualRow(container, addBtn) {
+        function setMechanicsExistingPhoto(card, item) {
+            if (!card) return;
+            const preview = card.querySelector('.mechanics-phase-preview');
+            const previewImg = preview && preview.querySelector('img');
+            const removeBtn = card.querySelector('.mechanics-remove-photo');
+            const notesEl = card.querySelector('.mechanics-phase-notes');
+            const fileInput = card.querySelector('.visual-file');
+            if (fileInput) fileInput.value = '';
+            if (!item) {
+                delete card.dataset.attachmentId;
+                delete card.dataset.fileUrl;
+                setPreviewImage(preview, previewImg, null);
+                if (removeBtn) removeBtn.hidden = true;
+                return;
+            }
+            card.dataset.attachmentId = String(item.attachment_id);
+            card.dataset.fileUrl = item.file_url || '';
+            setPreviewImage(preview, previewImg, item.file_url || '');
+            if (removeBtn) removeBtn.hidden = false;
+            if (notesEl && !(notesEl.value || '').trim() && (item.caption || '').trim()) {
+                notesEl.value = String(item.caption).trim();
+                autosizeTextarea(notesEl);
+            }
+        }
+
+        function addVisualRow(container, addBtn, existing = null) {
             if (container.querySelectorAll('.visual-row').length >= MAX_VISUALS) {
                 addBtn.disabled = true;
                 return;
@@ -1137,13 +1644,16 @@
                 <span class="visual-order">#1</span>
                 <div class="visual-row-fields">
                     <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
+                    <div class="visual-preview" hidden>
+                        <img alt="Extra image preview">
+                    </div>
                     <select class="visual-slot">
                         <option value="other">Slot: Other</option>
                         <option value="blast">Slot: Blast Motion</option>
                         <option value="vald">Slot: VALD</option>
                         <option value="hittrax">Slot: HitTrax</option>
                     </select>
-                    <input type="text" class="visual-caption" placeholder="Caption (optional)">
+                    <textarea class="visual-caption" placeholder="Caption (optional)"></textarea>
                 </div>
                 <div class="visual-row-actions">
                     <button type="button" class="icon-btn visual-up" title="Move up" aria-label="Move up">↑</button>
@@ -1151,7 +1661,42 @@
                     <button type="button" class="icon-btn visual-remove" title="Remove" aria-label="Remove">×</button>
                 </div>
             `;
+            const captionEl = row.querySelector('.visual-caption');
+            const slotEl = row.querySelector('.visual-slot');
+            const fileInput = row.querySelector('.visual-file');
+            const preview = row.querySelector('.visual-preview');
+            const previewImg = preview.querySelector('img');
+            if (existing) {
+                row.dataset.attachmentId = String(existing.attachment_id);
+                row.dataset.fileUrl = existing.file_url || '';
+                if (existing.slot) slotEl.value = existing.slot;
+                captionEl.value = (existing.caption || '').trim();
+                setPreviewImage(preview, previewImg, existing.file_url || '');
+            }
+            autosizeTextarea(captionEl);
+            captionEl.addEventListener('input', () => {
+                autosizeTextarea(captionEl);
+                regenAttachmentOrderDirty = true;
+            });
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) {
+                    if (row.dataset.attachmentId) {
+                        setPreviewImage(preview, previewImg, row.dataset.fileUrl || '');
+                    } else {
+                        setPreviewImage(preview, previewImg, null);
+                    }
+                    return;
+                }
+                if (row.dataset.attachmentId) {
+                    regenPendingDeleteIds.add(String(row.dataset.attachmentId));
+                }
+                setPreviewImage(preview, previewImg, URL.createObjectURL(file), { objectUrl: true });
+            });
             row.querySelector('.visual-remove').addEventListener('click', () => {
+                if (row.dataset.attachmentId) {
+                    regenPendingDeleteIds.add(String(row.dataset.attachmentId));
+                }
                 row.remove();
                 refreshVisualOrderLabels(container);
             });
@@ -1190,7 +1735,11 @@
                 const fileInput = card.querySelector('.visual-file');
                 const file = fileInput && fileInput.files && fileInput.files[0];
                 if (!file) return;
-                items.push({ file, caption: '', slot });
+                items.push({
+                    file,
+                    caption: (card.querySelector('.mechanics-phase-notes')?.value || '').trim(),
+                    slot,
+                });
             });
             return items;
         }
@@ -1239,7 +1788,6 @@
         }
 
         const loadAttachmentsBtn = document.getElementById('loadAttachmentsBtn');
-        const existingAttachmentsEl = document.getElementById('existingAttachments');
         const reportVersionsEl = document.getElementById('reportVersions');
         const regenNotesEl = document.getElementById('regenNotes');
         const regenVideoUrlEl = document.getElementById('regenVideoUrl');
@@ -1266,6 +1814,155 @@
         let regenAttachmentOrderDirty = false;
         let regenPlayerLookupToken = 0;
 
+        function notesReplaceRange(el, start, end, text, selStart, selEnd) {
+            el.value = el.value.slice(0, start) + text + el.value.slice(end);
+            el.setSelectionRange(selStart, selEnd);
+            el.focus();
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        function notesLineRange(el) {
+            const value = el.value;
+            let start = el.selectionStart;
+            let end = el.selectionEnd;
+            while (start > 0 && value[start - 1] !== '\n') start -= 1;
+            if (end === start) {
+                while (end < value.length && value[end] !== '\n') end += 1;
+            } else {
+                if (end > start && value[end - 1] === '\n') end -= 1;
+                while (end < value.length && value[end] !== '\n') end += 1;
+            }
+            return { start, end, text: value.slice(start, end) };
+        }
+
+        function notesMapLines(text, fn) {
+            return text.split('\n').map(fn).join('\n');
+        }
+
+        function notesToggleInline(el, marker) {
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            const value = el.value;
+            const selected = value.slice(start, end);
+            const markLen = marker.length;
+            if (
+                selected.length >= markLen * 2 &&
+                selected.startsWith(marker) &&
+                selected.endsWith(marker)
+            ) {
+                const inner = selected.slice(markLen, selected.length - markLen);
+                notesReplaceRange(el, start, end, inner, start, start + inner.length);
+                return;
+            }
+            if (
+                start >= markLen &&
+                value.slice(start - markLen, start) === marker &&
+                value.slice(end, end + markLen) === marker
+            ) {
+                notesReplaceRange(
+                    el,
+                    start - markLen,
+                    end + markLen,
+                    selected,
+                    start - markLen,
+                    end - markLen
+                );
+                return;
+            }
+            const wrapped = `${marker}${selected}${marker}`;
+            const cursor = start + markLen;
+            notesReplaceRange(
+                el,
+                start,
+                end,
+                wrapped,
+                selected ? start + markLen : cursor,
+                selected ? start + markLen + selected.length : cursor
+            );
+        }
+
+        function notesApplyHeading(el) {
+            const range = notesLineRange(el);
+            const next = notesMapLines(range.text, (line) => {
+                const stripped = line.replace(/^#{1,3}\s+/, '').replace(/^[-*]\s+/, '');
+                return `# ${stripped}`.trimEnd();
+            });
+            notesReplaceRange(el, range.start, range.end, next, range.start, range.start + next.length);
+        }
+
+        function notesApplyBody(el) {
+            const range = notesLineRange(el);
+            const next = notesMapLines(range.text, (line) => (
+                line.replace(/^#{1,3}\s+/, '')
+            ));
+            notesReplaceRange(el, range.start, range.end, next, range.start, range.start + next.length);
+        }
+
+        function notesToggleBullet(el) {
+            const range = notesLineRange(el);
+            const lines = range.text.split('\n');
+            const allBullets = lines.every((line) => !line.trim() || /^[-*]\s+/.test(line));
+            const next = lines.map((line) => {
+                if (!line.trim()) return line;
+                const stripped = line.replace(/^#{1,3}\s+/, '').replace(/^[-*]\s+/, '');
+                return allBullets ? stripped : `- ${stripped}`;
+            }).join('\n');
+            notesReplaceRange(el, range.start, range.end, next, range.start, range.start + next.length);
+        }
+
+        function notesApplyCommand(el, command) {
+            if (command === 'bold') notesToggleInline(el, '**');
+            else if (command === 'italic') notesToggleInline(el, '*');
+            else if (command === 'heading') notesApplyHeading(el);
+            else if (command === 'body') notesApplyBody(el);
+            else if (command === 'bullet') notesToggleBullet(el);
+            if (typeof autosizeTextarea === 'function') autosizeTextarea(el);
+        }
+
+        function enhanceNotesEditor(textarea) {
+            if (!textarea || textarea.closest('.notes-editor')) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'notes-editor';
+            textarea.parentNode.insertBefore(wrap, textarea);
+            const toolbar = document.createElement('div');
+            toolbar.className = 'notes-toolbar';
+            toolbar.setAttribute('role', 'toolbar');
+            toolbar.setAttribute('aria-label', 'Text formatting');
+            [
+                { cmd: 'bold', label: 'B', title: 'Bold', className: 'notes-bold' },
+                { cmd: 'italic', label: 'I', title: 'Italic', className: 'notes-italic' },
+                { cmd: 'heading', label: 'Heading', title: 'Heading' },
+                { cmd: 'body', label: 'Body', title: 'Body text' },
+                { cmd: 'bullet', label: 'List', title: 'Bullet list' },
+            ].forEach((item) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.cmd = item.cmd;
+                btn.title = item.title;
+                btn.setAttribute('aria-label', item.title);
+                btn.textContent = item.label;
+                if (item.className) btn.className = item.className;
+                btn.addEventListener('mousedown', (e) => e.preventDefault());
+                btn.addEventListener('click', () => notesApplyCommand(textarea, item.cmd));
+                toolbar.appendChild(btn);
+            });
+            wrap.appendChild(toolbar);
+            wrap.appendChild(textarea);
+            textarea.addEventListener('keydown', (e) => {
+                const key = (e.key || '').toLowerCase();
+                if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+                if (key === 'b') {
+                    e.preventDefault();
+                    notesApplyCommand(textarea, 'bold');
+                } else if (key === 'i') {
+                    e.preventDefault();
+                    notesApplyCommand(textarea, 'italic');
+                }
+            });
+        }
+
+        document.querySelectorAll('textarea.notes-field').forEach(enhanceNotesEditor);
+
         regenNotesEl.addEventListener('input', () => { regenNotesDirty = true; });
         regenVideoUrlEl.addEventListener('input', () => { regenVideoDirty = true; });
         regenMechanicalSummaryEl.addEventListener('input', () => { regenMechSummaryDirty = true; });
@@ -1274,12 +1971,6 @@
         [regenUsedBlastEl, regenUsedHittraxEl, regenUsedValdEl].forEach((input) => {
             input.addEventListener('change', () => { regenToolsDirty = true; });
         });
-
-        function attachmentSlotLabel(slot) {
-            const phase = MECHANICS_PHASES.find((p) => p.slot === slot);
-            if (phase) return phase.label;
-            return (slot || 'other').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-        }
 
         async function loadExistingAttachments(assessmentId) {
             const response = await fetch(`${API_URL}/${assessmentId}/attachments`);
@@ -1325,35 +2016,82 @@
             return data;
         }
 
-        function collectExistingAttachmentOrder() {
-            return Array.from(
-                existingAttachmentsEl.querySelectorAll('.attachment-row')
-            ).map((row) => Number(row.dataset.attachmentId)).filter(Boolean);
-        }
-
-        function moveExistingAttachmentRow(row, direction) {
-            const group = row.parentElement;
-            if (!group || !group.classList.contains('attachment-group')) return;
-            if (direction < 0 && row.previousElementSibling) {
-                group.insertBefore(row, row.previousElementSibling);
-            } else if (direction > 0 && row.nextElementSibling) {
-                group.insertBefore(row.nextElementSibling, row);
-            }
-            regenAttachmentOrderDirty = true;
-            refreshExistingAttachmentOrderLabels();
-        }
-
-        function refreshExistingAttachmentOrderLabels() {
-            existingAttachmentsEl.querySelectorAll('.attachment-group').forEach((group) => {
-                group.querySelectorAll('.attachment-row').forEach((row, idx) => {
-                    const badge = row.querySelector('.mechanics-photo-order');
-                    if (badge) badge.textContent = `#${idx + 1}`;
+        function hydrateExistingMedia(assessmentId, attachments) {
+            regenPendingDeleteIds = new Set();
+            regenAttachmentOrderDirty = false;
+            const phaseSlots = MECHANICS_PHASES.map((p) => p.slot);
+            const bySlot = {};
+            const extras = [];
+            (attachments || []).forEach((item) => {
+                const slot = item.slot || 'other';
+                const fileUrl = item.file_url
+                    || `${API_URL}/${assessmentId}/attachments/${item.attachment_id}/file`;
+                const resolved = { ...item, file_url: fileUrl };
+                if (phaseSlots.includes(slot)) {
+                    (bySlot[slot] ||= []).push(resolved);
+                } else {
+                    extras.push(resolved);
+                }
+            });
+            MECHANICS_PHASES.forEach((phase) => {
+                const card = regenMechanicsRowsEl.querySelector(`[data-slot="${phase.slot}"]`);
+                const items = bySlot[phase.slot] || [];
+                setMechanicsExistingPhoto(card, items[0] || null);
+                items.slice(1).forEach((item) => {
+                    if (item.attachment_id != null) {
+                        regenPendingDeleteIds.add(String(item.attachment_id));
+                    }
                 });
             });
+            regenVisualRowsEl.innerHTML = '';
+            extras.forEach((item) => addVisualRow(regenVisualRowsEl, regenAddVisualBtn, item));
+            if (!extras.length) {
+                addVisualRow(regenVisualRowsEl, regenAddVisualBtn);
+            }
         }
 
-        async function saveExistingAttachmentOrder(assessmentId) {
-            const ids = collectExistingAttachmentOrder();
+        function collectRemainingAttachmentIds(uploaded = []) {
+            const ids = [];
+            let uploadIdx = 0;
+            regenMechanicsRowsEl.querySelectorAll('.mechanics-phase-card').forEach((card) => {
+                const file = card.querySelector('.visual-file')?.files?.[0];
+                if (file) {
+                    const up = uploaded[uploadIdx++];
+                    if (up && up.attachment_id != null) ids.push(Number(up.attachment_id));
+                    return;
+                }
+                const existing = card.dataset.attachmentId;
+                if (existing && !regenPendingDeleteIds.has(String(existing))) {
+                    ids.push(Number(existing));
+                }
+            });
+            regenVisualRowsEl.querySelectorAll('.visual-row').forEach((row) => {
+                const file = row.querySelector('.visual-file')?.files?.[0];
+                if (file) {
+                    const up = uploaded[uploadIdx++];
+                    if (up && up.attachment_id != null) ids.push(Number(up.attachment_id));
+                    return;
+                }
+                const existing = row.dataset.attachmentId;
+                if (existing && !regenPendingDeleteIds.has(String(existing))) {
+                    ids.push(Number(existing));
+                }
+            });
+            return ids.filter((id) => Number.isInteger(id) && id > 0);
+        }
+
+        function collectExtraCaptionUpdates() {
+            const captions = {};
+            regenVisualRowsEl.querySelectorAll('.visual-row').forEach((row) => {
+                const id = row.dataset.attachmentId;
+                if (!id || regenPendingDeleteIds.has(String(id))) return;
+                if (row.querySelector('.visual-file')?.files?.[0]) return;
+                captions[id] = (row.querySelector('.visual-caption')?.value || '').trim();
+            });
+            return captions;
+        }
+
+        async function saveExistingAttachmentOrder(assessmentId, ids) {
             if (!ids.length) return null;
             const response = await fetch(`${API_URL}/${assessmentId}/attachments/order`, {
                 method: 'PUT',
@@ -1367,110 +2105,26 @@
             return data;
         }
 
-        function renderExistingAttachments(assessmentId, items) {
-            existingAttachmentsEl.innerHTML = '';
-            regenAttachmentOrderDirty = false;
-            if (!items.length) {
-                existingAttachmentsEl.innerHTML =
-                    '<div class="helper-text">No images attached to this assessment yet.</div>';
-                return;
-            }
-
-            const phaseSlots = MECHANICS_PHASES.map((p) => p.slot);
-            const bySlot = {};
-            const extras = [];
-            items.forEach((item) => {
-                const slot = item.slot || 'other';
-                if (phaseSlots.includes(slot)) {
-                    (bySlot[slot] ||= []).push(item);
-                } else {
-                    extras.push(item);
-                }
+        async function saveAttachmentCaptions(assessmentId, captions) {
+            const keys = Object.keys(captions || {});
+            if (!keys.length) return null;
+            const response = await fetch(`${API_URL}/${assessmentId}/attachments/captions`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ captions }),
             });
-
-            function appendAttachmentRow(parent, item, { reorderable }) {
-                const row = document.createElement('div');
-                row.className = 'attachment-row';
-                row.dataset.attachmentId = String(item.attachment_id);
-                row.dataset.slot = item.slot || 'other';
-                const caption = (item.caption || '').trim();
-                const orderBadge = reorderable
-                    ? '<span class="mechanics-photo-order">#1</span>'
-                    : '';
-                const actions = reorderable
-                    ? `<div class="visual-row-actions">
-                            <button type="button" class="icon-btn attachment-up" title="Move up" aria-label="Move up">↑</button>
-                            <button type="button" class="icon-btn attachment-down" title="Move down" aria-label="Move down">↓</button>
-                       </div>`
-                    : '';
-                row.innerHTML = `
-                    ${orderBadge}
-                    <input type="checkbox" class="attachment-select" value="${item.attachment_id}">
-                    <div class="attachment-info">
-                        <span class="attachment-slot">${attachmentSlotLabel(item.slot)}</span>
-                        <span class="attachment-caption${caption ? '' : ' missing'}">
-                            — ${caption || 'no caption'}
-                        </span>
-                    </div>
-                    ${actions}
-                `;
-                if (reorderable) {
-                    row.querySelector('.attachment-up').addEventListener('click', () => {
-                        moveExistingAttachmentRow(row, -1);
-                    });
-                    row.querySelector('.attachment-down').addEventListener('click', () => {
-                        moveExistingAttachmentRow(row, 1);
-                    });
-                }
-                parent.appendChild(row);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not save captions (${response.status})`);
             }
-
-            MECHANICS_PHASES.forEach((phase) => {
-                const groupItems = bySlot[phase.slot] || [];
-                if (!groupItems.length) return;
-                const label = document.createElement('div');
-                label.className = 'attachment-group-label';
-                label.textContent = `${phase.label} (${groupItems.length})`;
-                existingAttachmentsEl.appendChild(label);
-                const group = document.createElement('div');
-                group.className = 'attachment-group';
-                group.dataset.slot = phase.slot;
-                groupItems.forEach((item) => {
-                    appendAttachmentRow(group, item, { reorderable: groupItems.length > 1 });
-                });
-                existingAttachmentsEl.appendChild(group);
-            });
-
-            if (extras.length) {
-                const label = document.createElement('div');
-                label.className = 'attachment-group-label';
-                label.textContent = `Other visuals (${extras.length})`;
-                existingAttachmentsEl.appendChild(label);
-                const group = document.createElement('div');
-                group.className = 'attachment-group';
-                group.dataset.slot = 'other';
-                extras.forEach((item) => {
-                    appendAttachmentRow(group, item, { reorderable: extras.length > 1 });
-                });
-                existingAttachmentsEl.appendChild(group);
-            }
-
-            refreshExistingAttachmentOrderLabels();
-            const helper = document.createElement('div');
-            helper.className = 'helper-text';
-            helper.textContent =
-                'Selected images will be deleted when Generate PDF is clicked. ↑ ↓ changes photo order on the PDF.';
-            existingAttachmentsEl.appendChild(helper);
+            return data;
         }
 
-        async function deleteSelectedAttachments(assessmentId, regenerate) {
-            const ids = Array.from(
-                existingAttachmentsEl.querySelectorAll('.attachment-select:checked')
-            ).map((box) => box.value);
-            if (!ids.length) return null;
-
+        async function deleteAttachmentsByIds(assessmentId, ids, regenerate) {
+            const wanted = [...new Set((ids || []).map(String).filter(Boolean))];
+            if (!wanted.length) return null;
             const response = await fetch(
-                `${API_URL}/${assessmentId}/attachments?ids=${ids.join(',')}` +
+                `${API_URL}/${assessmentId}/attachments?ids=${wanted.join(',')}` +
                 `&regenerate=${regenerate ? '1' : '0'}`,
                 { method: 'DELETE' }
             );
@@ -1605,6 +2259,12 @@
                 opt.value = a.visit_key;
                 opt.textContent = `${a.visit_label} · #${a.assessment_id} · ${a.assessment_date}`;
                 opt.dataset.assessmentId = String(a.assessment_id);
+                if (a.assessment_date) {
+                    opt.dataset.assessmentDate = String(a.assessment_date);
+                }
+                if (a.visit_label) {
+                    opt.dataset.visitLabel = String(a.visit_label);
+                }
                 regenVisitEl.appendChild(opt);
             });
             regenVisitEl.disabled = false;
@@ -1617,6 +2277,7 @@
             if (name.length < 2) {
                 resetRegenVisitSelect('Enter a player name');
                 regenLookupStatusEl.textContent = '';
+                refreshRegenPlayerBio();
                 return [];
             }
 
@@ -1629,6 +2290,7 @@
             if (token !== regenPlayerLookupToken) return [];
             if (!response.ok) {
                 resetRegenVisitSelect('Lookup failed');
+                refreshRegenPlayerBio({ playerName: name });
                 throw new Error(data.error || `Could not look up ${name}`);
             }
 
@@ -1636,13 +2298,19 @@
             if (!assessments.length) {
                 resetRegenVisitSelect('No assessments found');
                 regenLookupStatusEl.textContent =
-                    `No assessments found for ${name}. Create a new assessment submission above.`;
+                    `No assessments found for ${name}. Choose Submit a new assessment to create one.`;
+                refreshRegenPlayerBio({ playerName: data.player_name || name });
                 return [];
             }
 
             populateRegenVisits(assessments);
             regenLookupStatusEl.textContent =
                 `${assessments.length} assessment${assessments.length === 1 ? '' : 's'} found for ${data.player_name || name}`;
+            const selected = regenVisitEl.selectedOptions[0];
+            refreshRegenPlayerBio({
+                playerName: data.player_name || name,
+                date: (selected && selected.dataset.assessmentDate) || '',
+            });
             return assessments;
         }
 
@@ -1685,6 +2353,7 @@
 
         // Auto-load keeps notes/tools/images in sync with the selected assessment.
         let regenLoadedId = null;
+        let regenLoadedDetails = null;
         let regenAutoLoadToken = 0;
 
         async function loadRegenAssessment(assessmentId, { force = false } = {}) {
@@ -1694,8 +2363,6 @@
 
             const token = ++regenAutoLoadToken;
             regenLoadedId = id;
-            existingAttachmentsEl.innerHTML =
-                '<div class="helper-text">Loading attached images…</div>';
             if (reportVersionsEl) {
                 reportVersionsEl.innerHTML =
                     '<div class="helper-text">Loading PDF versions…</div>';
@@ -1707,14 +2374,21 @@
                     fetchReportVersions(id).catch(() => []),
                 ]);
                 if (token !== regenAutoLoadToken) return;
+                regenLoadedDetails = details;
                 applyAssessmentDetails(details);
-                renderExistingAttachments(id, attachments);
+                hydrateExistingMedia(id, attachments);
                 renderReportVersions(versions);
+                refreshRegenDataPeek(details);
+                refreshRegenPlayerBio({
+                    playerName: details.player_name,
+                    date: details.assessment_date,
+                });
             } catch (err) {
                 if (token !== regenAutoLoadToken) return;
                 regenLoadedId = null;
-                existingAttachmentsEl.innerHTML = '';
+                regenLoadedDetails = null;
                 if (reportVersionsEl) reportVersionsEl.innerHTML = '';
+                refreshRegenPlayerBio();
                 throw err;
             }
         }
@@ -1747,7 +2421,12 @@
         regenIdInput.addEventListener('input', () => {
             clearTimeout(regenIdTimer);
             const id = regenIdInput.value.trim();
-            if (!Number.isInteger(Number(id)) || Number(id) < 1) return;
+            if (!Number.isInteger(Number(id)) || Number(id) < 1) {
+                if (getRegenLookupMode() === 'id') {
+                    refreshRegenPlayerBio({ clear: true });
+                }
+                return;
+            }
             regenIdTimer = setTimeout(() => autoLoadRegenAssessment(id), 400);
         });
 
@@ -1852,6 +2531,7 @@
             const name = titleCaseName(rawName.trim());
             if (name.length < 2) {
                 resetTypePanel();
+                refreshCreatePlayerBio();
                 return;
             }
 
@@ -1866,6 +2546,7 @@
                 if (!response.ok) {
                     lookupStatus.textContent = 'Could not look up priors — check connection and try again.';
                     resetTypePanel();
+                    refreshCreatePlayerBio();
                     return;
                 }
 
@@ -1882,11 +2563,13 @@
                 } else {
                     showRetest(assessments);
                 }
+                refreshCreatePlayerBio();
             } catch (err) {
                 if (token !== lookupToken) return;
                 console.error('Prior lookup failed:', err);
                 lookupStatus.textContent = 'Lookup failed. You can still submit after retrying the name.';
                 resetTypePanel();
+                refreshCreatePlayerBio();
             }
         }
 
@@ -1932,6 +2615,16 @@
             // datalist pick
             this.value = titleCaseName(this.value);
             lookupPlayerPriors(this.value);
+        });
+
+        let createBioTimer = null;
+        playerNameInput.addEventListener('input', () => {
+            clearTimeout(createBioTimer);
+            createBioTimer = setTimeout(() => refreshCreatePlayerBio(), 400);
+        });
+
+        assessmentDateInput.addEventListener('change', () => {
+            refreshCreatePlayerBio();
         });
 
         document.getElementById('trainerName').addEventListener('blur', function () {
@@ -2161,8 +2854,8 @@
             try {
                 const id = await resolveRegenAssessmentId();
                 const visuals = collectAllVisualUploads(regenMechanicsRowsEl, regenVisualRowsEl);
-                const hadLoadedAttachments =
-                    Boolean(existingAttachmentsEl.querySelector('.attachment-row'));
+                const pendingDeletes = [...regenPendingDeleteIds];
+                const captionUpdates = collectExtraCaptionUpdates();
                 const updates = {};
                 if (regenNotesDirty) {
                     updates.notes = regenNotesEl.value.trim();
@@ -2187,38 +2880,33 @@
                 // Always send current phase notes so cards stay in sync with the form.
                 updates.mechanicsPhaseNotes = collectMechanicsPhaseNotes(regenMechanicsRowsEl);
 
-                const deleteData = await deleteSelectedAttachments(id, false);
+                const deleteData = await deleteAttachmentsByIds(id, pendingDeletes, false);
                 const deletedCount = deleteData?.deleted?.length || 0;
-                if (deletedCount) {
-                    existingAttachmentsEl.querySelectorAll('.attachment-select:checked').forEach((box) => {
-                        box.closest('.attachment-row')?.remove();
-                    });
-                    refreshExistingAttachmentOrderLabels();
-                }
                 let uploadedCount = 0;
                 let reordered = false;
-
-                if (regenAttachmentOrderDirty && collectExistingAttachmentOrder().length) {
-                    await saveExistingAttachmentOrder(id);
-                    reordered = true;
-                    regenAttachmentOrderDirty = false;
-                }
+                let captionsSaved = false;
+                let uploadData = null;
 
                 if (visuals.length) {
-                    const uploadData = await uploadVisuals(id, visuals, { regenerate: false });
+                    uploadData = await uploadVisuals(id, visuals, { regenerate: false });
                     uploadedCount = uploadData.uploaded?.length || 0;
-                    initMechanicsRows(
-                        regenMechanicsRowsEl,
-                        collectMechanicsPhaseNotes(regenMechanicsRowsEl)
-                    );
-                    regenVisualRowsEl.innerHTML = '';
-                    addVisualRow(regenVisualRowsEl, regenAddVisualBtn);
+                }
+                if (Object.keys(captionUpdates).length) {
+                    await saveAttachmentCaptions(id, captionUpdates);
+                    captionsSaved = true;
+                }
+                const remainingIds = collectRemainingAttachmentIds(uploadData?.uploaded || []);
+                if (remainingIds.length) {
+                    await saveExistingAttachmentOrder(id, remainingIds);
+                    reordered = true;
+                    regenAttachmentOrderDirty = false;
                 }
 
                 const changes = [];
                 if (deletedCount) changes.push(`removed ${deletedCount} image(s)`);
                 if (uploadedCount) changes.push(`uploaded ${uploadedCount} image(s)`);
                 if (reordered) changes.push('updated photo order');
+                if (captionsSaved) changes.push('updated image captions');
                 if (regenNotesDirty) changes.push('updated notes');
                 if (regenVideoDirty) changes.push('updated video link');
                 if (regenMechSummaryDirty) changes.push('updated mechanical observation');
@@ -2241,9 +2929,10 @@
                 regenTrainingFocusDirty = false;
                 regenBestOfDayDirty = false;
                 regenPhaseNotesDirty = false;
-
-                if (hadLoadedAttachments) {
-                    renderExistingAttachments(id, await loadExistingAttachments(id));
+                try {
+                    await loadRegenAssessment(id, { force: true });
+                } catch (reloadErr) {
+                    console.error('Reload after generate failed:', reloadErr);
                 }
             } catch (err) {
                 console.error('Regenerate failed:', err);
@@ -2256,7 +2945,510 @@
 
         let lastSubmittedId = null;
 
+        const CREATE_STEP_LABELS = ['Athlete', 'Session', 'Swing photos', 'Extra images', 'Notes'];
+        const REGEN_STEP_LABELS = ['Find assessment', 'Session', 'Images', 'Notes', 'Generate'];
+        const modeChooserEl = document.getElementById('modeChooser');
+        const regenSectionEl = document.getElementById('regenSection');
+        const modeStatusEl = document.getElementById('modeStatus');
+        const modeStatusLabelEl = document.getElementById('modeStatusLabel');
+        const createProgressEl = document.getElementById('createProgress');
+        const regenProgressEl = document.getElementById('regenProgress');
+        const createStepLabelEl = document.getElementById('createStepLabel');
+        const regenStepLabelEl = document.getElementById('regenStepLabel');
+        const createPrevBtn = document.getElementById('createPrevBtn');
+        const createNextBtn = document.getElementById('createNextBtn');
+        const regenPrevBtn = document.getElementById('regenPrevBtn');
+        const regenNextBtn = document.getElementById('regenNextBtn');
+
+        let wizardMode = null;
+        let createStep = 0;
+        let regenStep = 0;
+
+        function wizardSteps(root) {
+            return Array.from(root.querySelectorAll(':scope > .wizard-step'));
+        }
+
+        function renderWizardDots(container, labels, current, onSelect) {
+            container.innerHTML = '';
+            labels.forEach((label, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'wizard-dot' + (i < current ? ' is-done' : '');
+                btn.textContent = `${i + 1}. ${label}`;
+                if (i === current) btn.setAttribute('aria-current', 'step');
+                btn.addEventListener('click', () => onSelect(i));
+                container.appendChild(btn);
+            });
+        }
+
+        let createToolsUserTouched = false;
+        ['usedBlast', 'usedHittrax', 'usedVald'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', () => { createToolsUserTouched = true; });
+        });
+
+        function formatPeekNumber(value) {
+            if (value == null || value === '') return null;
+            const n = Number(value);
+            if (!Number.isFinite(n)) return null;
+            return Number.isInteger(n) ? String(n) : n.toFixed(1);
+        }
+
+        function dashOrValue(value) {
+            const text = (value == null ? '' : String(value)).trim();
+            return text || '—';
+        }
+
+        function createVisitLabel() {
+            if (assessmentType === 'initial') return 'Initial';
+            if (assessmentType === 'retest') {
+                return (typeBadge.textContent || '').trim() || 'Retest';
+            }
+            return '';
+        }
+
+        function regenVisitLabel(details) {
+            const selected = regenVisitEl.selectedOptions[0];
+            if (selected && selected.dataset.visitLabel) {
+                return selected.dataset.visitLabel;
+            }
+            if (details && details.visit_label) return details.visit_label;
+            const type = ((details && details.assessment_type) || '').toString().toLowerCase();
+            if (type === 'initial') return 'Initial';
+            if (type === 'retest') {
+                const n = Number(details && details.retest_number);
+                if (Number.isInteger(n) && n >= 1) return `${ordinal(n)} Retest`;
+                return 'Retest';
+            }
+            return type ? type.charAt(0).toUpperCase() + type.slice(1) : '';
+        }
+
+        async function visitLabelForPlayerAssessment(playerName, assessmentId) {
+            if (!playerName || !assessmentId) return '';
+            const response = await fetch(`${API_URL}/player/${encodeURIComponent(playerName)}`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return '';
+            const visits = annotateVisitNumbers(data.assessments || []);
+            const match = visits.find((a) => String(a.assessment_id) === String(assessmentId));
+            return (match && match.visit_label) || '';
+        }
+
+        function appendBioPeekCell(grid, label, value, extraClass) {
+            const cell = document.createElement('div');
+            cell.className = extraClass
+                ? `player-bio-peek-cell ${extraClass}`
+                : 'player-bio-peek-cell';
+            const span = document.createElement('span');
+            span.textContent = label;
+            const strong = document.createElement('strong');
+            strong.textContent = value;
+            cell.appendChild(span);
+            cell.appendChild(strong);
+            grid.appendChild(cell);
+        }
+
+        function setPlayerBioPeek(el, {
+            idle,
+            idleText,
+            loading,
+            error,
+            bio,
+            playerName,
+            visitLabel,
+        } = {}) {
+            if (!el) return;
+            el.classList.remove('is-found', 'is-empty', 'is-loading', 'is-idle');
+            el.replaceChildren();
+            const note = (text) => {
+                const p = document.createElement('div');
+                p.className = 'player-bio-peek-note';
+                p.textContent = text;
+                el.appendChild(p);
+            };
+            if (loading) {
+                el.classList.add('is-loading');
+                note('Looking up player directory…');
+                return;
+            }
+            if (error) {
+                el.classList.add('is-empty');
+                note(error);
+                return;
+            }
+            if (idle || !bio) {
+                el.classList.add('is-idle');
+                note(
+                    idleText ||
+                    'Enter a player name to preview height, weight, and age from the player directory (same values as the PDF header).'
+                );
+                return;
+            }
+
+            const found = !!bio.found;
+            el.classList.add(found ? 'is-found' : 'is-empty');
+            const kicker = document.createElement('div');
+            kicker.className = 'player-bio-peek-kicker';
+            kicker.textContent = 'Player directory · PDF header';
+            el.appendChild(kicker);
+            const grid = document.createElement('div');
+            grid.className = 'player-bio-peek-grid';
+            appendBioPeekCell(grid, 'Athlete', dashOrValue(playerName), 'is-wide');
+            appendBioPeekCell(grid, 'Assessment', dashOrValue(visitLabel), 'is-wide');
+            appendBioPeekCell(grid, 'Height', found ? dashOrValue(bio.height) : '—', 'is-bio');
+            appendBioPeekCell(grid, 'Weight', found ? dashOrValue(bio.weight) : '—', 'is-bio');
+            appendBioPeekCell(grid, 'Age', found ? dashOrValue(bio.age_display) : '—', 'is-bio');
+            el.appendChild(grid);
+            if (!found) {
+                note('Not in player directory — height, weight, and age will print as — on the PDF. Name must match the directory spelling.');
+            }
+        }
+
+        async function fetchPlayerBio(playerName, dateStr) {
+            const params = new URLSearchParams({ playerName });
+            if (dateStr) params.set('date', dateStr);
+            const response = await fetch(`${API_URL}/player-bio?${params.toString()}`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not look up player directory (${response.status})`);
+            }
+            return data;
+        }
+
+        let createBioToken = 0;
+        async function refreshCreatePlayerBio() {
+            const el = document.getElementById('playerBioPeek');
+            const player = titleCaseName(playerNameInput.value.trim());
+            const dateStr = assessmentDateInput.value;
+            if (player.length < 2) {
+                setPlayerBioPeek(el, { idle: true });
+                return;
+            }
+            const token = ++createBioToken;
+            setPlayerBioPeek(el, { loading: true });
+            try {
+                const bio = await fetchPlayerBio(player, dateStr);
+                if (token !== createBioToken) return;
+                setPlayerBioPeek(el, {
+                    bio,
+                    playerName: player,
+                    visitLabel: createVisitLabel(),
+                });
+            } catch (err) {
+                if (token !== createBioToken) return;
+                setPlayerBioPeek(el, {
+                    error: err.message || 'Could not look up player directory',
+                });
+            }
+        }
+
+        let regenBioToken = 0;
+        const REGEN_BIO_IDLE =
+            'Height, weight, and age from the player directory appear here once a player is identified.';
+
+        async function refreshRegenPlayerBio({ playerName, date, clear } = {}) {
+            const el = document.getElementById('regenPlayerBioPeek');
+            if (clear) {
+                setPlayerBioPeek(el, { idle: true, idleText: REGEN_BIO_IDLE });
+                return;
+            }
+            let player = (playerName || '').trim();
+            let dateStr = date || '';
+            if (!player) {
+                if (regenLoadedDetails && regenLoadedDetails.player_name) {
+                    player = regenLoadedDetails.player_name;
+                    dateStr = dateStr || regenLoadedDetails.assessment_date || '';
+                } else if (getRegenLookupMode() === 'player') {
+                    player = titleCaseName(regenPlayerNameEl.value.trim());
+                    const selected = regenVisitEl.selectedOptions[0];
+                    dateStr = dateStr || (selected && selected.dataset.assessmentDate) || '';
+                }
+            }
+            if (!player || player.length < 2) {
+                setPlayerBioPeek(el, { idle: true, idleText: REGEN_BIO_IDLE });
+                return;
+            }
+            const token = ++regenBioToken;
+            setPlayerBioPeek(el, { loading: true });
+            try {
+                const bio = await fetchPlayerBio(player, dateStr);
+                if (token !== regenBioToken) return;
+                let visitLabel = regenVisitLabel(regenLoadedDetails);
+                if (!visitLabel && regenLoadedId) {
+                    visitLabel = await visitLabelForPlayerAssessment(player, regenLoadedId);
+                    if (token !== regenBioToken) return;
+                    if (visitLabel && regenLoadedDetails) {
+                        regenLoadedDetails.visit_label = visitLabel;
+                    }
+                }
+                setPlayerBioPeek(el, { bio, playerName: player, visitLabel });
+            } catch (err) {
+                if (token !== regenBioToken) return;
+                setPlayerBioPeek(el, {
+                    error: err.message || 'Could not look up player directory',
+                });
+            }
+        }
+
+        function setToolPeek(el, { loading, error, found, text } = {}) {
+            if (!el) return;
+            el.classList.remove('is-found', 'is-empty', 'is-loading', 'is-idle');
+            if (loading) {
+                el.classList.add('is-loading');
+                el.textContent = 'Looking up session data…';
+                return;
+            }
+            if (error) {
+                el.classList.add('is-empty');
+                el.textContent = error;
+                return;
+            }
+            if (text == null) {
+                el.classList.add('is-idle');
+                el.textContent = 'Counts load after player and date are set.';
+                return;
+            }
+            el.classList.add(found ? 'is-found' : 'is-empty');
+            el.textContent = text;
+        }
+
+        function applyDataPeek(peek, { autoCheck = false, target = 'create' } = {}) {
+            const blast = peek.blast || {};
+            const hittrax = peek.hittrax || {};
+            const vald = peek.vald || {};
+            const peakBat = formatPeekNumber(blast.peak_bat_speed);
+            const peakEv = formatPeekNumber(hittrax.peak_ev);
+            const blastText = blast.found
+                ? `${blast.swing_count} swing${blast.swing_count === 1 ? '' : 's'}` +
+                  (peakBat ? ` · peak bat speed ${peakBat} mph` : '')
+                : 'No swings found for this date';
+            const hittraxText = hittrax.found
+                ? `${hittrax.contact_count} contact${hittrax.contact_count === 1 ? '' : 's'}` +
+                  (peakEv ? ` · peak EV ${peakEv} mph` : '')
+                : 'No contacts found for this date';
+            const valdParts = [];
+            if (vald.cmj_trials) valdParts.push(`CMJ ${vald.cmj_trials}`);
+            if (vald.sj_trials) valdParts.push(`SJ ${vald.sj_trials}`);
+            if (vald.hj_trials) valdParts.push(`HJ ${vald.hj_trials}`);
+            if (vald.imtp_trials) valdParts.push(`IMTP ${vald.imtp_trials}`);
+            const valdText = vald.found
+                ? (valdParts.join(' · ') || `${vald.trial_count} test(s)`)
+                : 'No tests found for this date';
+
+            setToolPeek(document.getElementById(
+                target === 'regen' ? 'regenUsedBlastPeek' : 'usedBlastPeek'
+            ), { found: !!blast.found, text: blastText });
+            setToolPeek(document.getElementById(
+                target === 'regen' ? 'regenUsedHittraxPeek' : 'usedHittraxPeek'
+            ), { found: !!hittrax.found, text: hittraxText });
+            setToolPeek(document.getElementById(
+                target === 'regen' ? 'regenUsedValdPeek' : 'usedValdPeek'
+            ), { found: !!vald.found, text: valdText });
+
+            if (autoCheck) {
+                const blastEl = document.getElementById('usedBlast');
+                const hittraxEl = document.getElementById('usedHittrax');
+                const valdEl = document.getElementById('usedVald');
+                if (blastEl) blastEl.checked = !!blast.found;
+                if (hittraxEl) hittraxEl.checked = !!hittrax.found;
+                if (valdEl) valdEl.checked = !!vald.found;
+            }
+        }
+
+        async function fetchDataPeek(playerName, dateStr) {
+            const params = new URLSearchParams({
+                playerName,
+                date: dateStr,
+            });
+            const response = await fetch(`${API_URL}/data-peek?${params.toString()}`);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not look up session data (${response.status})`);
+            }
+            return data;
+        }
+
+        async function refreshCreateDataPeek() {
+            const player = titleCaseName(playerNameInput.value.trim());
+            const dateStr = assessmentDateInput.value;
+            const targets = ['usedBlastPeek', 'usedHittraxPeek', 'usedValdPeek'];
+            if (!player || !dateStr) {
+                targets.forEach((id) => setToolPeek(document.getElementById(id), {}));
+                return;
+            }
+            targets.forEach((id) => setToolPeek(document.getElementById(id), { loading: true }));
+            try {
+                const peek = await fetchDataPeek(player, dateStr);
+                applyDataPeek(peek, { autoCheck: !createToolsUserTouched, target: 'create' });
+            } catch (err) {
+                const msg = err.message || 'Could not look up session data';
+                targets.forEach((id) => setToolPeek(document.getElementById(id), { error: msg }));
+            }
+        }
+
+        async function refreshRegenDataPeek(details) {
+            const player = (details && details.player_name) || '';
+            const dateStr = (details && details.assessment_date) || '';
+            const targets = ['regenUsedBlastPeek', 'regenUsedHittraxPeek', 'regenUsedValdPeek'];
+            if (!player || !dateStr) {
+                targets.forEach((id) => setToolPeek(document.getElementById(id), {
+                    text: 'Counts load after an assessment is selected.',
+                    found: false,
+                }));
+                const els = targets.map((id) => document.getElementById(id));
+                els.forEach((el) => {
+                    if (!el) return;
+                    el.classList.remove('is-found', 'is-empty');
+                    el.classList.add('is-idle');
+                });
+                return;
+            }
+            targets.forEach((id) => setToolPeek(document.getElementById(id), { loading: true }));
+            try {
+                const peek = await fetchDataPeek(player, dateStr);
+                applyDataPeek(peek, { autoCheck: false, target: 'regen' });
+            } catch (err) {
+                const msg = err.message || 'Could not look up session data';
+                targets.forEach((id) => setToolPeek(document.getElementById(id), { error: msg }));
+            }
+        }
+
+        function showCreateStep(index) {
+            const steps = wizardSteps(form);
+            const last = steps.length - 1;
+            createStep = Math.max(0, Math.min(index, last));
+            steps.forEach((step, i) => {
+                step.hidden = i !== createStep;
+            });
+            createPrevBtn.disabled = createStep === 0;
+            createNextBtn.hidden = createStep === last;
+            createStepLabelEl.textContent = `${createStep + 1} of ${steps.length} · ${CREATE_STEP_LABELS[createStep]}`;
+            renderWizardDots(createProgressEl, CREATE_STEP_LABELS, createStep, (target) => {
+                if (target === createStep) return;
+                if (target > createStep && !validateCreateStep()) return;
+                showCreateStep(target);
+            });
+            if (createStep === 1) refreshCreateDataPeek();
+            if (createStep === 2 || createStep === 3) {
+                form.querySelectorAll('.mechanics-phase-notes, .visual-caption')
+                    .forEach(autosizeTextarea);
+            }
+        }
+
+        function showRegenStep(index) {
+            const steps = wizardSteps(regenSectionEl);
+            const last = steps.length - 1;
+            regenStep = Math.max(0, Math.min(index, last));
+            steps.forEach((step, i) => {
+                step.hidden = i !== regenStep;
+            });
+            regenPrevBtn.disabled = regenStep === 0;
+            regenNextBtn.hidden = regenStep === last;
+            regenStepLabelEl.textContent = `${regenStep + 1} of ${steps.length} · ${REGEN_STEP_LABELS[regenStep]}`;
+            renderWizardDots(regenProgressEl, REGEN_STEP_LABELS, regenStep, (target) => {
+                if (target === regenStep) return;
+                if (target > regenStep && !validateRegenStep()) return;
+                showRegenStep(target);
+            });
+            if (regenStep === 1) refreshRegenDataPeek(regenLoadedDetails);
+            if (regenStep === 2 || regenStep === 3) {
+                regenSectionEl.querySelectorAll('.mechanics-phase-notes, .visual-caption, textarea')
+                    .forEach(autosizeTextarea);
+            }
+        }
+
+        function showChooser() {
+            wizardMode = null;
+            modeChooserEl.hidden = false;
+            form.hidden = true;
+            regenSectionEl.hidden = true;
+            modeStatusEl.hidden = true;
+        }
+
+        function enterWizardMode(mode) {
+            wizardMode = mode;
+            modeChooserEl.hidden = true;
+            modeStatusEl.hidden = false;
+            if (mode === 'create') {
+                modeStatusLabelEl.textContent = 'New assessment';
+                form.hidden = false;
+                regenSectionEl.hidden = true;
+                showCreateStep(createStep);
+            } else {
+                modeStatusLabelEl.textContent = 'Regenerate PDF';
+                form.hidden = true;
+                regenSectionEl.hidden = false;
+                showRegenStep(regenStep);
+            }
+        }
+
+        function validateCreateStep() {
+            if (createStep !== 0) return true;
+            const playerName = titleCaseName(playerNameInput.value.trim());
+            playerNameInput.value = playerName;
+            if (!playerName) {
+                showMessage('Please enter a player name.', 'error');
+                return false;
+            }
+            if (!assessmentDateInput.value) {
+                showMessage('Please select an assessment date.', 'error');
+                return false;
+            }
+            if (previousGroup.style.display !== 'none' && !previousSelect.value) {
+                showMessage('Please confirm which previous assessment to compare against.', 'error');
+                return false;
+            }
+            messageEl.classList.remove('show');
+            return true;
+        }
+
+        function validateRegenStep() {
+            if (regenStep !== 0) return true;
+            if (!regenLoadedId) {
+                showMessage('Select an assessment first so notes and images can load.', 'error');
+                return false;
+            }
+            messageEl.classList.remove('show');
+            regenMessageEl.classList.remove('show');
+            return true;
+        }
+
+        document.getElementById('chooseCreateBtn').addEventListener('click', () => {
+            enterWizardMode('create');
+        });
+        document.getElementById('chooseRegenBtn').addEventListener('click', () => {
+            enterWizardMode('regen');
+        });
+        document.getElementById('changeModeBtn').addEventListener('click', () => {
+            if (!confirm('Return to the start screen? Your entries will stay filled.')) return;
+            messageEl.classList.remove('show');
+            regenMessageEl.classList.remove('show');
+            showChooser();
+        });
+        createPrevBtn.addEventListener('click', () => showCreateStep(createStep - 1));
+        createNextBtn.addEventListener('click', () => {
+            if (!validateCreateStep()) return;
+            showCreateStep(createStep + 1);
+        });
+        regenPrevBtn.addEventListener('click', () => showRegenStep(regenStep - 1));
+        regenNextBtn.addEventListener('click', () => {
+            if (!validateRegenStep()) return;
+            showRegenStep(regenStep + 1);
+        });
+        form.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'textarea' || tag === 'button') return;
+            if (e.target.closest('button')) return;
+            e.preventDefault();
+            if (!createNextBtn.hidden) createNextBtn.click();
+        });
+
         messageEl.addEventListener('click', async (e) => {
+            if (e.target.closest('#successStartOverBtn')) {
+                messageEl.classList.remove('show');
+                showChooser();
+                return;
+            }
             const btn = e.target.closest('#successRegenBtn');
             if (!btn || !lastSubmittedId) return;
             try {
@@ -2269,6 +3461,7 @@
                     html +
                     `<div class="inline-actions">` +
                     `<button type="button" class="secondary-btn" id="successRegenBtn">Regenerate PDF</button>` +
+                    `<button type="button" class="secondary-btn" id="successStartOverBtn">Start another</button>` +
                     `</div>`,
                     'success'
                 );
@@ -2285,22 +3478,27 @@
             playerNameInput.value = playerName;
 
             if (!playerName) {
+                showCreateStep(0);
                 showMessage('Please enter a player name', 'error');
                 return;
             }
             if (!assessmentDateInput.value) {
+                showCreateStep(0);
                 showMessage('Please select an assessment date', 'error');
                 return;
             }
             if (!assessmentType) {
+                showCreateStep(0);
                 showMessage('Looking up prior assessments — wait a moment after entering the player name, then submit.', 'error');
                 await lookupPlayerPriors(playerName);
                 if (!assessmentType) {
+                    showCreateStep(0);
                     showMessage('Could not determine Initial vs Retest. Check the player name and try again.', 'error');
                     return;
                 }
             }
             if (assessmentType === 'retest' && !previousSelect.value) {
+                showCreateStep(0);
                 showMessage('Please confirm which previous assessment to compare against', 'error');
                 return;
             }
@@ -2364,7 +3562,10 @@
                     regenBestOfDayDirty = false;
                     regenPhaseNotesDirty = false;
                     regenLoadedId = String(data.assessment_id);
-                    existingAttachmentsEl.innerHTML = '';
+                    regenLoadedDetails = {
+                        player_name: playerName,
+                        assessment_date: assessmentDateInput.value,
+                    };
 
                     let reportUri = data.report_url || data.report_uri || data.report_gcs_uri;
                     let reportVersion = data.report_version;
@@ -2413,16 +3614,19 @@
                         downloadNote +
                         `<div class="inline-actions">` +
                         `<button type="button" class="secondary-btn" id="successRegenBtn">Regenerate PDF</button>` +
+                        `<button type="button" class="secondary-btn" id="successStartOverBtn">Start another</button>` +
                         `</div>`,
                         'success'
                     );
                     form.reset();
+                    createStep = 0;
                     initMechanicsRows(mechanicsRowsEl);
                     visualRowsEl.innerHTML = '';
                     addVisualBtn.disabled = false;
                     addVisualRow(visualRowsEl, addVisualBtn);
                     assessmentDateInput.value = today;
                     resetTypePanel();
+                    showChooser();
                     setTimeout(loadRecentNames, 1000);
                 } else {
                     showMessage(`Error: ${data.error || 'Failed to submit assessment'}`, 'error');

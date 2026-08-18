@@ -15,9 +15,10 @@ import logging
 import json
 import re
 from datetime import datetime
+from io import BytesIO
 from typing import Optional
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, send_file
 from flask_cors import CORS
 import mysql.connector
 
@@ -475,6 +476,90 @@ def submit_assessment():
 # Read assessments (power form autocomplete / retest dropdowns)
 # ---------------------------------------------------------------------------
 
+@app.route("/api/hitting-assessment/data-peek", methods=["GET", "OPTIONS"])
+def peek_hitting_assessment_data():
+    """
+    Counts of Blast / HitTrax / VALD rows for a player on one calendar day.
+
+    Used by the form Session step so trainers can uncheck tools with no data.
+    Query: playerName (or player) + date (YYYY-MM-DD).
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    player = (
+        request.args.get("playerName")
+        or request.args.get("player")
+        or ""
+    ).strip()
+    date_str = (
+        request.args.get("date")
+        or request.args.get("assessmentDate")
+        or ""
+    ).strip()
+    if len(player) < 2:
+        return jsonify({"error": "playerName is required"}), 400
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+    try:
+        import report_metrics
+
+        connection = get_db_connection()
+        try:
+            peek = report_metrics.peek_session_metrics(connection, player, date_str)
+            return jsonify(peek), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("data-peek failed for %s %s", player, date_str)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/hitting-assessment/player-bio", methods=["GET", "OPTIONS"])
+def peek_player_directory_bio():
+    """
+    Height / weight / age from player_directory for the form peek.
+
+    Query: playerName (or player) + optional date (YYYY-MM-DD) for age.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    player = (
+        request.args.get("playerName")
+        or request.args.get("player")
+        or ""
+    ).strip()
+    date_str = (
+        request.args.get("date")
+        or request.args.get("assessmentDate")
+        or ""
+    ).strip()
+    if len(player) < 2:
+        return jsonify({"error": "playerName is required"}), 400
+    on_date = None
+    if date_str:
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d")
+            on_date = date_str
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+    try:
+        import report_metrics
+
+        connection = get_db_connection()
+        try:
+            bio = report_metrics.lookup_player_directory_bio(
+                connection, player, on_date
+            )
+            return jsonify({"player_name": player, **bio}), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("player-bio peek failed for %s", player)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/hitting-assessment/<int:assessment_id>', methods=['GET'])
 def get_assessment(assessment_id):
     """Return one assessment by primary key."""
@@ -829,6 +914,98 @@ def _regenerate_and_store(connection, row, assessment_id, generate_draft_report=
 
 
 @app.route(
+    "/api/hitting-assessment/<int:assessment_id>/attachments/<int:attachment_id>/file",
+    methods=["GET", "OPTIONS"],
+)
+def download_assessment_attachment_file(assessment_id, attachment_id):
+    """Stream one attached image so the form can preview it."""
+    if request.method == "OPTIONS":
+        return "", 204
+    try:
+        import attachments as attachments_mod
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+            att = next(
+                (
+                    a
+                    for a in attachments_mod.list_attachments(connection, assessment_id)
+                    if int(a["attachment_id"]) == attachment_id
+                ),
+                None,
+            )
+            if not att:
+                return jsonify({"error": "Attachment not found"}), 404
+            data = attachments_mod.load_image_bytes(att)
+            if not data:
+                return jsonify({"error": "Could not read image"}), 404
+            mime = att.get("content_type") or "image/jpeg"
+            return send_file(
+                BytesIO(data),
+                mimetype=mime,
+                download_name=f"attachment_{attachment_id}",
+                as_attachment=False,
+                max_age=120,
+            )
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception(
+            "Attachment file download failed for %s/%s",
+            assessment_id,
+            attachment_id,
+        )
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route(
+    "/api/hitting-assessment/<int:assessment_id>/attachments/captions",
+    methods=["PUT", "OPTIONS"],
+)
+def update_assessment_attachment_captions(assessment_id):
+    """Body: { "captions": { "12": "updated caption", ... } }."""
+    if request.method == "OPTIONS":
+        return "", 204
+    try:
+        import attachments as attachments_mod
+
+        data = request.get_json(silent=True) or {}
+        raw = data.get("captions")
+        if not isinstance(raw, dict) or not raw:
+            return jsonify({"error": "captions must be a non-empty object"}), 400
+        captions = {}
+        try:
+            for key, value in raw.items():
+                captions[int(key)] = "" if value is None else str(value)
+        except (TypeError, ValueError):
+            return jsonify({"error": "caption keys must be attachment ids"}), 400
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+            updated = attachments_mod.update_attachment_captions(
+                connection, assessment_id, captions
+            )
+            return jsonify({
+                "success": True,
+                "assessment_id": assessment_id,
+                "updated": updated,
+            }), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("Update captions failed for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route(
     "/api/hitting-assessment/<int:assessment_id>/attachments/order",
     methods=["PUT", "OPTIONS"],
 )
@@ -914,10 +1091,17 @@ def assessment_attachments(assessment_id):
             if request.method == "GET":
                 rows = attachments_mod.list_attachments(connection, assessment_id)
                 out = []
+                root = request.url_root.rstrip("/")
                 for r in rows:
                     item = dict(r)
                     if item.get("created_at") and hasattr(item["created_at"], "strftime"):
                         item["created_at"] = item["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+                    aid = item.get("attachment_id")
+                    if aid is not None:
+                        item["file_url"] = (
+                            f"{root}/api/hitting-assessment/{assessment_id}"
+                            f"/attachments/{aid}/file"
+                        )
                     out.append(item)
                 return jsonify({"assessment_id": assessment_id, "attachments": out}), 200
 

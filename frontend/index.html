@@ -260,7 +260,11 @@
             margin-bottom: 8px;
         }
 
-        .mechanics-phase-notes {
+            .mechanics-phase-status {
+                margin: 0 0 10px;
+            }
+
+            .mechanics-phase-notes {
             width: 100%;
             min-height: 56px;
             margin: 0 0 10px;
@@ -273,6 +277,25 @@
             flex-direction: column;
             gap: 8px;
             margin-bottom: 8px;
+        }
+
+        .mechanics-phase-preview {
+            width: 100%;
+            max-width: 168px;
+            aspect-ratio: 130 / 185;
+            background: #0f1720;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .mechanics-phase-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+        }
         }
 
         .mechanics-photo-row {
@@ -748,28 +771,65 @@
             </div>
 
             <div class="form-group">
+                <label for="mechanicalSummary">Mechanical Observation</label>
+                <textarea
+                    id="mechanicalSummary"
+                    name="mechanicalSummary"
+                    placeholder="Overall mechanical takeaways for this session..."
+                ></textarea>
+                <div class="helper-text">
+                    Page 1, left card.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="trainingFocus">Training Focus</label>
+                <textarea
+                    id="trainingFocus"
+                    name="trainingFocus"
+                    placeholder="- Eliminate sway in the load&#10;- Get the barrel on time"
+                ></textarea>
+                <div class="helper-text">
+                    Page 1, right card. Use <code>- bullets</code> if you want a list.
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label for="notes">
                     Assessment Notes
                 </label>
                 <textarea 
                     id="notes" 
-                    name="notes" 
-                    placeholder="Enter any observations, goals, or specific focuses for this assessment..."
+                    name="notes"
+                    placeholder="Short session notes (shown under the two cards on page 1)..."
                 ></textarea>
                 <div class="helper-text">
-                    Optional notes (supports basic Markdown:
+                    Page 1, bottom strip. Supports basic Markdown:
                     <code>**bold**</code>, <code>*italic*</code>,
-                    <code>`code`</code>, <code>- bullets</code>,
-                    <code>1. lists</code>, <code># headings</code>)
+                    <code>`code`</code>, <code>- bullets</code>.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="bestOfDaySummary">Best of Day Summary (optional)</label>
+                <textarea
+                    id="bestOfDaySummary"
+                    name="bestOfDaySummary"
+                    placeholder="One overall note on jump / hop / pull tests..."
+                ></textarea>
+                <div class="helper-text">
+                    Printed in the Overall Summary box under Best of Day Metrics.
+                    Leave blank to keep the empty box.
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Mechanics phase cards (optional)</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
-                    One card per swing phase (Load Phase → Impact). Add notes and up to
-                    3 photos per phase (Load often needs two). Use ↑ ↓ to set photo order
-                    in the PDF (top = first). PNG/JPEG/WebP, up to 4&nbsp;MB each.
+                    One card per swing phase (Load Phase → Impact). Choose Strength /
+                    Monitor / Development, add a caption, and attach <strong>one photo</strong>
+                    per phase. PNG/JPEG/WebP, up to 4&nbsp;MB each. Photos are shown in a
+                    fixed portrait frame on the PDF (center-cropped to match).
                 </p>
                 <div id="mechanicsRows"></div>
             </div>
@@ -870,23 +930,42 @@
                 >
             </div>
             <div class="form-group">
+                <label for="regenMechanicalSummary">Mechanical Observation</label>
+                <textarea
+                    id="regenMechanicalSummary"
+                    placeholder="Overall mechanical takeaways for this session..."
+                ></textarea>
+            </div>
+            <div class="form-group">
+                <label for="regenTrainingFocus">Training Focus</label>
+                <textarea
+                    id="regenTrainingFocus"
+                    placeholder="- Eliminate sway in the load"
+                ></textarea>
+            </div>
+            <div class="form-group">
                 <label for="regenNotes">Assessment Notes</label>
                 <textarea
                     id="regenNotes"
-                    placeholder="Update observations, goals, or areas of focus for this PDF..."
+                    placeholder="Short session notes for page 1..."
                 ></textarea>
                 <div class="helper-text">
-                    Load the assessment below to view its saved notes and tool selections.
-                    Notes support basic Markdown (<code>**bold**</code>, <code>*italic*</code>,
-                    lists, headings).
+                    Load the assessment below to view saved notes. Page 1 bottom strip.
                 </div>
+            </div>
+            <div class="form-group">
+                <label for="regenBestOfDaySummary">Best of Day Summary (optional)</label>
+                <textarea
+                    id="regenBestOfDaySummary"
+                    placeholder="One overall note on jump / hop / pull tests..."
+                ></textarea>
             </div>
             <div class="form-group">
                 <label>Images already attached</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
                     Notes, tools, and images load automatically once an assessment is
-                    selected above. Check any image to remove it. Use ↑ ↓ within a phase
-                    to change photo order on the PDF card.
+                    selected above. Check any image to remove it. Each swing phase keeps
+                    one photo on the PDF (first by sort order).
                 </p>
                 <button type="button" class="secondary-btn" id="loadAttachmentsBtn">
                     Reload from saved assessment
@@ -896,8 +975,8 @@
             <div class="form-group">
                 <label>Mechanics phase cards (optional)</label>
                 <p class="section-intro" style="margin: 0 0 12px;">
-                    Notes + photos per phase (up to 3 photos each). Use ↑ ↓ for PDF order
-                    among new photos in a phase.
+                    Status, caption, and one new photo per phase. If a phase already has
+                    a photo, remove it above before uploading a replacement.
                 </p>
                 <div id="regenMechanicsRows"></div>
             </div>
@@ -929,7 +1008,6 @@
     <!-- LOCAL TESTING: uncomment the next line, then open this file in a browser.
     <script>window.HEAT_API_BASE = 'http://localhost:8080';</script>
     -->
-    <script>window.HEAT_API_BASE = 'http://localhost:8080';</script>
 
     <script>
         // Production Cloud Run (heat-assessment-api).
@@ -941,7 +1019,6 @@
         const API_URL = `${API_BASE}/api/hitting-assessment`;
 
         const MAX_VISUALS = 6;
-        const MAX_PHOTOS_PER_PHASE = 3;
         const MECHANICS_PHASES = [
             { slot: 'load_phase', label: 'Load Phase' },
             { slot: 'load_position', label: 'Load Position' },
@@ -978,77 +1055,14 @@
             refreshVisualOrderLabels(container);
         }
 
-        function refreshMechanicsPhotoOrder(card) {
-            const filesEl = card.querySelector('.mechanics-phase-files');
-            if (!filesEl) return;
-            filesEl.querySelectorAll('.mechanics-photo-row').forEach((row, idx) => {
-                const badge = row.querySelector('.mechanics-photo-order');
-                if (badge) badge.textContent = `#${idx + 1}`;
-            });
-        }
-
-        function refreshMechanicsAddPhotoBtn(card) {
-            const filesEl = card.querySelector('.mechanics-phase-files');
-            const addBtn = card.querySelector('.mechanics-add-photo');
-            if (!filesEl || !addBtn) return;
-            const count = filesEl.querySelectorAll('.mechanics-photo-row').length;
-            addBtn.disabled = count >= MAX_PHOTOS_PER_PHASE;
-            addBtn.textContent = count >= MAX_PHOTOS_PER_PHASE
-                ? `Max ${MAX_PHOTOS_PER_PHASE} photos`
-                : '+ Add photo';
-            refreshMechanicsPhotoOrder(card);
-        }
-
-        function moveMechanicsPhotoRow(row, direction) {
-            const container = row.parentElement;
-            if (direction < 0 && row.previousElementSibling) {
-                container.insertBefore(row, row.previousElementSibling);
-            } else if (direction > 0 && row.nextElementSibling) {
-                container.insertBefore(row.nextElementSibling, row);
+        function phaseNoteEntry(raw) {
+            if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                return {
+                    status: String(raw.status || '').trim().toLowerCase(),
+                    caption: String(raw.caption || raw.notes || raw.text || '').trim(),
+                };
             }
-            const card = row.closest('.mechanics-phase-card');
-            if (card) refreshMechanicsPhotoOrder(card);
-        }
-
-        function addMechanicsPhotoRow(card) {
-            const filesEl = card.querySelector('.mechanics-phase-files');
-            if (!filesEl) return;
-            if (filesEl.querySelectorAll('.mechanics-photo-row').length >= MAX_PHOTOS_PER_PHASE) {
-                refreshMechanicsAddPhotoBtn(card);
-                return;
-            }
-            const row = document.createElement('div');
-            row.className = 'mechanics-photo-row';
-            row.innerHTML = `
-                <span class="mechanics-photo-order">#1</span>
-                <div class="visual-row-fields">
-                    <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
-                    <input type="text" class="visual-caption" placeholder="Caption (optional)">
-                </div>
-                <div class="visual-row-actions">
-                    <button type="button" class="icon-btn mechanics-photo-up" title="Move up" aria-label="Move up">↑</button>
-                    <button type="button" class="icon-btn mechanics-photo-down" title="Move down" aria-label="Move down">↓</button>
-                    <button type="button" class="icon-btn mechanics-photo-remove" title="Remove photo" aria-label="Remove photo">×</button>
-                </div>
-            `;
-            row.querySelector('.mechanics-photo-up').addEventListener('click', () => {
-                moveMechanicsPhotoRow(row, -1);
-            });
-            row.querySelector('.mechanics-photo-down').addEventListener('click', () => {
-                moveMechanicsPhotoRow(row, 1);
-            });
-            row.querySelector('.mechanics-photo-remove').addEventListener('click', () => {
-                const remaining = filesEl.querySelectorAll('.mechanics-photo-row').length;
-                if (remaining <= 1) {
-                    row.querySelector('.visual-file').value = '';
-                    row.querySelector('.visual-caption').value = '';
-                    return;
-                }
-                row.remove();
-                refreshMechanicsAddPhotoBtn(card);
-            });
-            filesEl.appendChild(row);
-            refreshMechanicsAddPhotoBtn(card);
+            return { status: '', caption: String(raw || '').trim() };
         }
 
         function initMechanicsRows(container, notesBySlot = {}) {
@@ -1058,25 +1072,57 @@
                 const card = document.createElement('div');
                 card.className = 'mechanics-phase-card';
                 card.dataset.slot = phase.slot;
+                const entry = phaseNoteEntry(notes[phase.slot]);
                 card.innerHTML = `
                     <div class="mechanics-phase-header">${phase.label}</div>
+                    <select class="mechanics-phase-status">
+                        <option value="">Status (optional)</option>
+                        <option value="strength">Strength</option>
+                        <option value="monitor">Monitor</option>
+                        <option value="development">Development</option>
+                    </select>
                     <textarea class="mechanics-phase-notes" rows="2"
-                        placeholder="Notes for this phase (optional)"></textarea>
-                    <div class="mechanics-phase-files"></div>
-                    <button type="button" class="secondary-btn mechanics-add-photo">+ Add photo</button>
+                        placeholder="Caption / cues for this phase (optional)"></textarea>
+                    <div class="mechanics-phase-files">
+                        <input type="file" class="visual-file" accept="image/png,image/jpeg,image/webp,image/gif">
+                        <div class="mechanics-phase-preview" hidden>
+                            <img alt="Phase photo preview">
+                        </div>
+                    </div>
                 `;
+                const statusEl = card.querySelector('.mechanics-phase-status');
                 const notesEl = card.querySelector('.mechanics-phase-notes');
-                notesEl.value = notes[phase.slot] || '';
-                notesEl.addEventListener('input', () => {
+                if (['strength', 'monitor', 'development'].includes(entry.status)) {
+                    statusEl.value = entry.status;
+                }
+                notesEl.value = entry.caption;
+                const markDirty = () => {
                     if (container === regenMechanicsRowsEl) {
                         regenPhaseNotesDirty = true;
                     }
-                });
-                card.querySelector('.mechanics-add-photo').addEventListener('click', () => {
-                    addMechanicsPhotoRow(card);
+                };
+                statusEl.addEventListener('change', markDirty);
+                notesEl.addEventListener('input', markDirty);
+                const fileInput = card.querySelector('.visual-file');
+                const preview = card.querySelector('.mechanics-phase-preview');
+                const previewImg = preview.querySelector('img');
+                fileInput.addEventListener('change', () => {
+                    const file = fileInput.files && fileInput.files[0];
+                    if (previewImg.dataset.objectUrl) {
+                        URL.revokeObjectURL(previewImg.dataset.objectUrl);
+                        delete previewImg.dataset.objectUrl;
+                    }
+                    if (!file) {
+                        preview.hidden = true;
+                        previewImg.removeAttribute('src');
+                        return;
+                    }
+                    const url = URL.createObjectURL(file);
+                    previewImg.dataset.objectUrl = url;
+                    previewImg.src = url;
+                    preview.hidden = false;
                 });
                 container.appendChild(card);
-                addMechanicsPhotoRow(card);
             });
         }
 
@@ -1126,8 +1172,13 @@
             const notes = {};
             container.querySelectorAll('.mechanics-phase-card').forEach((card) => {
                 const slot = card.dataset.slot || '';
-                const text = (card.querySelector('.mechanics-phase-notes')?.value || '').trim();
-                if (slot && text) notes[slot] = text;
+                const status = (card.querySelector('.mechanics-phase-status')?.value || '').trim();
+                const caption = (card.querySelector('.mechanics-phase-notes')?.value || '').trim();
+                if (!slot || (!status && !caption)) return;
+                const entry = {};
+                if (status) entry.status = status;
+                if (caption) entry.caption = caption;
+                notes[slot] = entry;
             });
             return notes;
         }
@@ -1136,16 +1187,10 @@
             const items = [];
             container.querySelectorAll('.mechanics-phase-card').forEach((card) => {
                 const slot = card.dataset.slot || 'other';
-                card.querySelectorAll('.mechanics-photo-row').forEach((row) => {
-                    const fileInput = row.querySelector('.visual-file');
-                    const file = fileInput && fileInput.files && fileInput.files[0];
-                    if (!file) return;
-                    items.push({
-                        file,
-                        caption: (row.querySelector('.visual-caption').value || '').trim(),
-                        slot,
-                    });
-                });
+                const fileInput = card.querySelector('.visual-file');
+                const file = fileInput && fileInput.files && fileInput.files[0];
+                if (!file) return;
+                items.push({ file, caption: '', slot });
             });
             return items;
         }
@@ -1198,6 +1243,9 @@
         const reportVersionsEl = document.getElementById('reportVersions');
         const regenNotesEl = document.getElementById('regenNotes');
         const regenVideoUrlEl = document.getElementById('regenVideoUrl');
+        const regenMechanicalSummaryEl = document.getElementById('regenMechanicalSummary');
+        const regenTrainingFocusEl = document.getElementById('regenTrainingFocus');
+        const regenBestOfDaySummaryEl = document.getElementById('regenBestOfDaySummary');
         const regenUsedBlastEl = document.getElementById('regenUsedBlast');
         const regenUsedHittraxEl = document.getElementById('regenUsedHittrax');
         const regenUsedValdEl = document.getElementById('regenUsedVald');
@@ -1212,11 +1260,17 @@
         let regenNotesDirty = false;
         let regenVideoDirty = false;
         let regenToolsDirty = false;
+        let regenMechSummaryDirty = false;
+        let regenTrainingFocusDirty = false;
+        let regenBestOfDayDirty = false;
         let regenAttachmentOrderDirty = false;
         let regenPlayerLookupToken = 0;
 
         regenNotesEl.addEventListener('input', () => { regenNotesDirty = true; });
         regenVideoUrlEl.addEventListener('input', () => { regenVideoDirty = true; });
+        regenMechanicalSummaryEl.addEventListener('input', () => { regenMechSummaryDirty = true; });
+        regenTrainingFocusEl.addEventListener('input', () => { regenTrainingFocusDirty = true; });
+        regenBestOfDaySummaryEl.addEventListener('input', () => { regenBestOfDayDirty = true; });
         [regenUsedBlastEl, regenUsedHittraxEl, regenUsedValdEl].forEach((input) => {
             input.addEventListener('change', () => { regenToolsDirty = true; });
         });
@@ -1248,6 +1302,9 @@
         function applyAssessmentDetails(data) {
             regenNotesEl.value = data.notes || '';
             regenVideoUrlEl.value = data.video_analysis_url || '';
+            regenMechanicalSummaryEl.value = data.mechanical_summary || '';
+            regenTrainingFocusEl.value = data.training_focus || '';
+            regenBestOfDaySummaryEl.value = data.best_of_day_summary || '';
             regenUsedBlastEl.checked = data.used_blast !== 0 && data.used_blast !== false;
             regenUsedHittraxEl.checked =
                 data.used_hittrax !== 0 && data.used_hittrax !== false;
@@ -1256,6 +1313,9 @@
             regenNotesDirty = false;
             regenVideoDirty = false;
             regenToolsDirty = false;
+            regenMechSummaryDirty = false;
+            regenTrainingFocusDirty = false;
+            regenBestOfDayDirty = false;
             regenPhaseNotesDirty = false;
         }
 
@@ -2110,6 +2170,15 @@
                 if (regenVideoDirty) {
                     updates.videoAnalysisUrl = regenVideoUrlEl.value.trim();
                 }
+                if (regenMechSummaryDirty) {
+                    updates.mechanicalSummary = regenMechanicalSummaryEl.value.trim();
+                }
+                if (regenTrainingFocusDirty) {
+                    updates.trainingFocus = regenTrainingFocusEl.value.trim();
+                }
+                if (regenBestOfDayDirty) {
+                    updates.bestOfDaySummary = regenBestOfDaySummaryEl.value.trim();
+                }
                 if (regenToolsDirty) {
                     updates.usedBlast = regenUsedBlastEl.checked;
                     updates.usedHittrax = regenUsedHittraxEl.checked;
@@ -2152,6 +2221,9 @@
                 if (reordered) changes.push('updated photo order');
                 if (regenNotesDirty) changes.push('updated notes');
                 if (regenVideoDirty) changes.push('updated video link');
+                if (regenMechSummaryDirty) changes.push('updated mechanical observation');
+                if (regenTrainingFocusDirty) changes.push('updated training focus');
+                if (regenBestOfDayDirty) changes.push('updated best of day summary');
                 if (regenToolsDirty) changes.push('updated tools');
                 if (regenPhaseNotesDirty) changes.push('updated phase notes');
                 const html = await regenerateReport(id, {
@@ -2165,6 +2237,9 @@
                 regenNotesDirty = false;
                 regenVideoDirty = false;
                 regenToolsDirty = false;
+                regenMechSummaryDirty = false;
+                regenTrainingFocusDirty = false;
+                regenBestOfDayDirty = false;
                 regenPhaseNotesDirty = false;
 
                 if (hadLoadedAttachments) {
@@ -2237,6 +2312,9 @@
                 trainerName: document.getElementById('trainerName').value.trim(),
                 notes: document.getElementById('notes').value.trim(),
                 videoAnalysisUrl: document.getElementById('videoAnalysisUrl').value.trim(),
+                mechanicalSummary: document.getElementById('mechanicalSummary').value.trim(),
+                trainingFocus: document.getElementById('trainingFocus').value.trim(),
+                bestOfDaySummary: document.getElementById('bestOfDaySummary').value.trim(),
                 usedBlast: document.getElementById('usedBlast').checked,
                 usedHittrax: document.getElementById('usedHittrax').checked,
                 usedVald: document.getElementById('usedVald').checked,
@@ -2268,6 +2346,9 @@
                     regenIdInput.value = data.assessment_id;
                     regenNotesEl.value = formData.notes;
                     regenVideoUrlEl.value = formData.videoAnalysisUrl || '';
+                    regenMechanicalSummaryEl.value = formData.mechanicalSummary || '';
+                    regenTrainingFocusEl.value = formData.trainingFocus || '';
+                    regenBestOfDaySummaryEl.value = formData.bestOfDaySummary || '';
                     regenUsedBlastEl.checked = formData.usedBlast;
                     regenUsedHittraxEl.checked = formData.usedHittrax;
                     regenUsedValdEl.checked = formData.usedVald;
@@ -2278,6 +2359,9 @@
                     regenNotesDirty = false;
                     regenVideoDirty = false;
                     regenToolsDirty = false;
+                    regenMechSummaryDirty = false;
+                    regenTrainingFocusDirty = false;
+                    regenBestOfDayDirty = false;
                     regenPhaseNotesDirty = false;
                     regenLoadedId = String(data.assessment_id);
                     existingAttachmentsEl.innerHTML = '';

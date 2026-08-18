@@ -20,9 +20,16 @@ ALLOWED_CONTENT_TYPES = {
     "image/gif": ".gif",
 }
 MAX_BYTES = 4 * 1024 * 1024  # 4 MB per file
-# Up to 3 images × 5 mechanics phases + several optional extras
+# One image × 5 mechanics phases + several optional extras
 MAX_FILES = 24
-MAX_PHOTOS_PER_MECHANICS_PHASE = 3
+MAX_PHOTOS_PER_MECHANICS_PHASE = 1
+MECHANICS_PHASE_SLOTS = (
+    "load_phase",
+    "load_position",
+    "stride_phase",
+    "launch_position",
+    "impact",
+)
 
 
 def _slug(name: str) -> str:
@@ -206,7 +213,7 @@ def store_image_bytes(
 
 
 def load_image_bytes(att: dict[str, Any]) -> Optional[bytes]:
-    """Load attachment bytes from local cache or HTTPS/gs URI."""
+    """Load attachment bytes from local cache or GCS (authenticated)."""
     local = att.get("local_path")
     if local and Path(local).is_file():
         return Path(local).read_bytes()
@@ -218,6 +225,14 @@ def load_image_bytes(att: dict[str, Any]) -> Optional[bytes]:
             return Path(path).read_bytes()
         return None
 
+    bucket, key = gcs_upload.parse_gcs_uri(uri)
+    if bucket and key:
+        try:
+            return gcs_upload.download_bytes(uri)
+        except Exception:
+            logger.exception("Failed to download attachment %s", uri)
+            return None
+
     if uri.startswith("https://") or uri.startswith("http://"):
         try:
             import requests
@@ -227,20 +242,6 @@ def load_image_bytes(att: dict[str, Any]) -> Optional[bytes]:
             return resp.content
         except Exception:
             logger.exception("Failed to download attachment %s", uri)
-            return None
-
-    if uri.startswith("gs://"):
-        # gs://bucket/key
-        try:
-            from google.cloud import storage
-
-            _, rest = uri.split("gs://", 1)
-            bucket_name, _, key = rest.partition("/")
-            client = storage.Client()
-            blob = client.bucket(bucket_name).blob(key)
-            return blob.download_as_bytes()
-        except Exception:
-            logger.exception("Failed to download gs attachment %s", uri)
             return None
 
     return None

@@ -59,6 +59,9 @@ ASSESSMENT_SELECT_COLUMNS = """
     previous_assessment_id,
     report_gcs_uri,
     mechanics_phase_notes,
+    mechanical_summary,
+    training_focus,
+    best_of_day_summary,
     created_at,
     updated_at
 """
@@ -70,6 +73,8 @@ MECHANICS_PHASE_SLOTS = (
     "launch_position",
     "impact",
 )
+MECHANICS_PHASE_STATUSES = ("strength", "monitor", "development")
+SUMMARY_TEXT_MAX = 8000
 
 
 def _parse_optional_int(value, field_name):
@@ -112,12 +117,22 @@ def _normalize_video_url(value) -> Optional[str]:
     return None
 
 
+def _normalize_optional_text(value, field_name, max_len=SUMMARY_TEXT_MAX):
+    """Return (ok, cleaned_or_None, error). Empty → None."""
+    if value is None:
+        return True, None, None
+    text = str(value).strip()
+    if not text:
+        return True, None, None
+    return True, text[:max_len], None
+
+
 def _normalize_mechanics_phase_notes(value):
     """
     Parse mechanicsPhaseNotes from JSON body into a cleaned dict or None.
 
+    Each slot is {status, caption}. Legacy string values become caption-only.
     Returns (ok, value_or_None, error_message).
-    Keys must be known swing-phase slots; empty notes are dropped.
     """
     if value is None or value == "":
         return True, None, None
@@ -133,9 +148,24 @@ def _normalize_mechanics_phase_notes(value):
         slot = str(key).strip()
         if slot not in MECHANICS_PHASE_SLOTS:
             return False, None, f"Unknown mechanics phase slot: {slot}"
-        text = str(raw or "").strip()
-        if text:
-            cleaned[slot] = text[:4000]
+        status = ""
+        caption = ""
+        if isinstance(raw, dict):
+            status = str(raw.get("status") or "").strip().lower()
+            caption = str(
+                raw.get("caption") or raw.get("notes") or raw.get("text") or ""
+            ).strip()
+        else:
+            caption = str(raw or "").strip()
+        if status and status not in MECHANICS_PHASE_STATUSES:
+            return False, None, f"Invalid status for {slot}"
+        entry = {}
+        if status:
+            entry["status"] = status
+        if caption:
+            entry["caption"] = caption[:SUMMARY_TEXT_MAX]
+        if entry:
+            cleaned[slot] = entry
     return True, (cleaned or None), None
 
 
@@ -240,6 +270,34 @@ def validate_assessment_data(data):
     if not notes_ok:
         return False, notes_err
     data["_mechanicsPhaseNotes"] = phase_notes
+
+    mech_ok, mech_summary, mech_err = _normalize_optional_text(
+        data.get("mechanicalSummary"), "mechanicalSummary"
+    )
+    if not mech_ok:
+        return False, mech_err
+    data["_mechanicalSummary"] = mech_summary
+
+    focus_ok, focus, focus_err = _normalize_optional_text(
+        data.get("trainingFocus"), "trainingFocus"
+    )
+    if not focus_ok:
+        return False, focus_err
+    data["_trainingFocus"] = focus
+
+    notes_text_ok, notes_text, notes_text_err = _normalize_optional_text(
+        data.get("notes"), "notes"
+    )
+    if not notes_text_ok:
+        return False, notes_text_err
+    data["_notes"] = notes_text
+
+    bod_ok, bod_summary, bod_err = _normalize_optional_text(
+        data.get("bestOfDaySummary"), "bestOfDaySummary"
+    )
+    if not bod_ok:
+        return False, bod_err
+    data["_bestOfDaySummary"] = bod_summary
     return True, None
 
 
@@ -340,14 +398,15 @@ def submit_assessment():
                      video_analysis_url,
                      used_blast, used_hittrax, used_vald,
                      assessment_type, previous_assessment_id,
-                     mechanics_phase_notes)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     mechanics_phase_notes, mechanical_summary,
+                     training_focus, best_of_day_summary)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 values = (
                     data['assessmentDate'],
                     player_name,
                     data.get('trainerName', '').strip() or None,
-                    data.get('notes', '').strip() or None,
+                    data.get("_notes"),
                     data['_videoAnalysisUrl'],
                     data['_usedBlast'],
                     data['_usedHittrax'],
@@ -355,6 +414,9 @@ def submit_assessment():
                     data['assessmentType'],
                     previous_id,
                     phase_notes_json,
+                    data.get("_mechanicalSummary"),
+                    data.get("_trainingFocus"),
+                    data.get("_bestOfDaySummary"),
                 )
                 cursor.execute(sql, values)
                 connection.commit()
@@ -554,8 +616,13 @@ def regenerate_hitting_assessment_report(assessment_id):
                 updates = []
                 values = []
                 if "notes" in data:
+                    ok, text, err = _normalize_optional_text(
+                        data.get("notes"), "notes"
+                    )
+                    if not ok:
+                        return jsonify({"error": err}), 400
                     updates.append("notes = %s")
-                    values.append(str(data.get("notes") or "").strip() or None)
+                    values.append(text)
                 if "videoAnalysisUrl" in data:
                     raw_video = data.get("videoAnalysisUrl")
                     if raw_video is not None and str(raw_video).strip():
@@ -586,6 +653,19 @@ def regenerate_hitting_assessment_report(assessment_id):
                     values.append(
                         json.dumps(phase_notes) if phase_notes else None
                     )
+                for json_key, column, field_name in (
+                    ("mechanicalSummary", "mechanical_summary", "mechanicalSummary"),
+                    ("trainingFocus", "training_focus", "trainingFocus"),
+                    ("bestOfDaySummary", "best_of_day_summary", "bestOfDaySummary"),
+                ):
+                    if json_key in data:
+                        ok, text, err = _normalize_optional_text(
+                            data.get(json_key), field_name
+                        )
+                        if not ok:
+                            return jsonify({"error": err}), 400
+                        updates.append(f"{column} = %s")
+                        values.append(text)
                 if updates:
                     values.append(assessment_id)
                     cursor.execute(
@@ -890,6 +970,34 @@ def assessment_attachments(assessment_id):
                 replaced = attachments_mod.delete_attachments(connection, assessment_id)
 
             existing = attachments_mod.list_attachments(connection, assessment_id)
+            incoming_slots = []
+            for i, storage in enumerate(uploaded):
+                slot = (
+                    request.form.get(f"slot{i}")
+                    or request.form.get(f"slots[{i}]")
+                    or request.form.get("slot")
+                    or "other"
+                )
+                incoming_slots.append(str(slot).strip() or "other")
+            existing_by_slot: dict[str, int] = {}
+            for att in existing:
+                s = str(att.get("slot") or "").strip()
+                if s in attachments_mod.MECHANICS_PHASE_SLOTS:
+                    existing_by_slot[s] = existing_by_slot.get(s, 0) + 1
+            incoming_by_slot: dict[str, int] = {}
+            for s in incoming_slots:
+                if s in attachments_mod.MECHANICS_PHASE_SLOTS:
+                    incoming_by_slot[s] = incoming_by_slot.get(s, 0) + 1
+            cap = attachments_mod.MAX_PHOTOS_PER_MECHANICS_PHASE
+            for s, n in incoming_by_slot.items():
+                if existing_by_slot.get(s, 0) + n > cap:
+                    return jsonify({
+                        "error": (
+                            f"At most {cap} photo per mechanics phase "
+                            f"({s.replace('_', ' ')}). Remove extras first."
+                        )
+                    }), 400
+
             sort_base = len(existing)
             saved = []
             errors = []
@@ -903,12 +1011,7 @@ def assessment_attachments(assessment_id):
                     or request.form.get("caption")
                     or ""
                 )
-                slot = (
-                    request.form.get(f"slot{i}")
-                    or request.form.get(f"slots[{i}]")
-                    or request.form.get("slot")
-                    or "other"
-                )
+                slot = incoming_slots[i]
                 try:
                     uri, local_path = attachments_mod.store_image_bytes(
                         assessment_id=assessment_id,

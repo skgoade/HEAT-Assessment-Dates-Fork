@@ -51,6 +51,9 @@ def generate_draft_report(
     if not isinstance(phase_notes, dict):
         phase_notes = {}
     bundle["mechanics_phase_notes"] = phase_notes
+    bundle["mechanical_summary"] = assessment_row.get("mechanical_summary")
+    bundle["training_focus"] = assessment_row.get("training_focus")
+    bundle["best_of_day_summary"] = assessment_row.get("best_of_day_summary")
 
     local_path = report_pdf.build_pdf(bundle)
 

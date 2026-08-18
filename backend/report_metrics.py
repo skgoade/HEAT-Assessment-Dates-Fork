@@ -8,9 +8,12 @@ initial for the player).
 from __future__ import annotations
 
 import logging
+import re
 import statistics
 from datetime import date, datetime, time
 from typing import Any, Optional
+
+import report_wellness
 
 logger = logging.getLogger(__name__)
 
@@ -30,18 +33,39 @@ def _percentile(sorted_vals: list[float], pct: float) -> Optional[float]:
 
 def _safe_stats(vals: list[float]) -> dict[str, Optional[float]]:
     clean = [v for v in vals if v is not None]
+    empty = {
+        "count": 0,
+        "avg": None,
+        "peak": None,
+        "sd": None,
+        "p90": None,
+        "q1": None,
+        "q2": None,
+        "q3": None,
+    }
     if not clean:
-        return {"count": 0, "avg": None, "peak": None, "sd": None, "p90": None}
+        return empty
     peak = max(clean)
     avg = statistics.mean(clean)
     sd = statistics.stdev(clean) if len(clean) > 1 else 0.0
-    p90 = _percentile(sorted(clean), 90)
+    ordered = sorted(clean)
+    p90 = _percentile(ordered, 90)
+    q1 = _percentile(ordered, 25)
+    q2 = _percentile(ordered, 50)
+    q3 = _percentile(ordered, 75)
+
+    def _r(v: Optional[float]) -> Optional[float]:
+        return round(v, 2) if v is not None else None
+
     return {
         "count": len(clean),
         "avg": round(avg, 2),
         "peak": round(peak, 2),
         "sd": round(sd, 2),
-        "p90": round(p90, 2) if p90 is not None else None,
+        "p90": _r(p90),
+        "q1": _r(q1),
+        "q2": _r(q2),
+        "q3": _r(q3),
     }
 
 
@@ -424,30 +448,42 @@ def aggregate_hittrax(rows: list[dict]) -> dict[str, Any]:
 
     hard_hit_las: list[float] = []
     ideal_evs: list[float] = []
+    hard_hit_n = 0
+    ideal_la_n = 0
     peak = ev_stats["peak"]
-    if peak:
-        # Hard hit ≈ within 10% of session peak EV (common HitTrax-style rule)
-        threshold = 0.9 * peak
-        for r in rows:
-            ev = r.get("ev")
-            la = r.get("launch_angle")
-            if ev is None:
-                continue
-            ev_f = float(ev)
-            if la is not None and ev_f >= threshold:
-                hard_hit_las.append(float(la))
-            if la is not None and 5 <= float(la) <= 15:
+    threshold = (0.9 * peak) if peak else None
+    for r in rows:
+        ev = r.get("ev")
+        la = r.get("launch_angle")
+        ev_f = float(ev) if ev is not None else None
+        la_f = float(la) if la is not None else None
+        if threshold is not None and ev_f is not None and ev_f >= threshold:
+            hard_hit_n += 1
+            if la_f is not None:
+                hard_hit_las.append(la_f)
+        if la_f is not None and 5 <= la_f <= 15:
+            ideal_la_n += 1
+            if ev_f is not None:
                 ideal_evs.append(ev_f)
 
+    n = len(rows)
+    hh_la = _safe_stats(hard_hit_las)
     return {
-        "swing_count": len(rows),
+        "swing_count": n,
         "peak_ev": ev_stats["peak"],
         "avg_ev": ev_stats["avg"],
         "p90_ev": ev_stats["p90"],
         "avg_launch_angle": _safe_stats(las)["avg"],
-        "avg_la_hard_hit": _safe_stats(hard_hit_las)["avg"],
+        "avg_la_hard_hit": hh_la["avg"],
+        "la_hard_hit_q2": hh_la["q2"],
+        "la_hard_hit_q3": hh_la["q3"],
+        "la_hard_hit_sd": hh_la["sd"],
         "avg_ev_ideal_la": _safe_stats(ideal_evs)["avg"],
         "avg_distance": _safe_stats(dists)["avg"],
+        "hard_hit_pct": (
+            round(100.0 * hard_hit_n / n, 1) if n and threshold is not None else None
+        ),
+        "ideal_la_pct": round(100.0 * ideal_la_n / n, 1) if n else None,
     }
 
 
@@ -754,84 +790,141 @@ def vald_series_for_charts(conn, player_name: str, assessment_date: Any) -> dict
     }
 
 
-def _vald_best(conn, table: str, metric_col: str, player_name: str, start: datetime, end: datetime) -> Optional[float]:
-    """Best (MAX) value of a VALD metric for athlete on the assessment day."""
-    # Column names have spaces/symbols — quote carefully
+# Report key, ForceDecks column, max|avg. Hop L/R peak force omitted — not in PlayerDev yet.
+VALD_AGG_SPECS: list[tuple[str, str, str, str]] = [
+    # IMTP
+    ("imtp_peak_force_bm", "VALD_FD_IMTP", "Peak Vertical Force / BM", "max"),
+    ("imtp_peak_force_l", "VALD_FD_IMTP", "Peak Vertical Force (Left)", "max"),
+    ("imtp_peak_force_r", "VALD_FD_IMTP", "Peak Vertical Force (Right)", "max"),
+    ("imtp_rfd_150", "VALD_FD_IMTP", "RFD - 150ms", "max"),
+    ("imtp_rfd_150_l", "VALD_FD_IMTP", "RFD - 150ms (Left)", "max"),
+    ("imtp_rfd_150_r", "VALD_FD_IMTP", "RFD - 150ms (Right)", "max"),
+    ("imtp_rfd_100", "VALD_FD_IMTP", "RFD - 100ms", "max"),
+    # Hop
+    ("hj_best_rsi", "VALD_FD_HJ", "Best RSI (Jump Height/Contact Time)", "max"),
+    ("hj_mean_rsi", "VALD_FD_HJ", "Mean RSI (Jump Height/Contact Time)", "avg"),
+    ("hj_best_contact_time", "VALD_FD_HJ", "Best Contact Time", "max"),
+    ("hj_mean_contact_time", "VALD_FD_HJ", "Mean Contact Time", "avg"),
+    ("hj_mean_jump_height", "VALD_FD_HJ", "Mean Jump Height (Flight Time)", "avg"),
+    ("hj_best_jump_height", "VALD_FD_HJ", "Best Jump Height (Flight Time)", "max"),
+    ("hj_best_peak_force", "VALD_FD_HJ", "Best Peak Force", "max"),
+    ("hj_mean_peak_force", "VALD_FD_HJ", "Mean Peak Force", "avg"),
+    # CMJ
+    ("cmj_rel_landing_force", "VALD_FD_CMJ", "Jump Height (FT) Relative Peak Landing Force", "max"),
+    ("cmj_jump_height_ft", "VALD_FD_CMJ", "Jump Height (Flight Time)", "max"),
+    ("cmj_rsi_mod", "VALD_FD_CMJ", "RSI-modified", "max"),
+    ("cmj_conc_duration", "VALD_FD_CMJ", "Concentric Duration", "max"),
+    ("cmj_conc_impulse", "VALD_FD_CMJ", "Concentric Impulse", "max"),
+    ("cmj_conc_impulse_l", "VALD_FD_CMJ", "Concentric Impulse (Left)", "max"),
+    ("cmj_conc_impulse_r", "VALD_FD_CMJ", "Concentric Impulse (Right)", "max"),
+    ("cmj_ecc_accel_phase", "VALD_FD_CMJ", "Eccentric Acceleration Phase Duration", "max"),
+    ("cmj_ecc_braking_rfd", "VALD_FD_CMJ", "Eccentric Braking RFD", "max"),
+    ("cmj_peak_power_bm", "VALD_FD_CMJ", "Peak Power / BM", "max"),
+    # SJ
+    ("sj_jump_height_ft", "VALD_FD_SJ", "Jump Height (Flight Time)", "max"),
+    ("sj_rel_landing_force", "VALD_FD_SJ", "Jump Height (FT) Relative Peak Landing Force", "max"),
+    ("sj_conc_rfd", "VALD_FD_SJ", "Concentric RFD", "max"),
+    ("sj_conc_rfd_l", "VALD_FD_SJ", "Concentric RFD (Left)", "max"),
+    ("sj_conc_rfd_r", "VALD_FD_SJ", "Concentric RFD (Right)", "max"),
+    ("sj_landing_impulse_l", "VALD_FD_SJ", "Landing Impulse (Left)", "max"),
+    ("sj_landing_impulse_r", "VALD_FD_SJ", "Landing Impulse (Right)", "max"),
+    ("sj_peak_power_bm", "VALD_FD_SJ", "Peak Power / BM", "max"),
+]
+
+
+def _vald_round(val: Any) -> Optional[float]:
+    if val is None:
+        return None
+    try:
+        return round(float(val), 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def _vald_table_aggs(
+    conn,
+    table: str,
+    specs: list[tuple[str, str, str]],
+    player_name: str,
+    start: datetime,
+    end: datetime,
+) -> dict[str, Any]:
+    """One query per table: COUNT plus MAX/AVG of columns that exist."""
+    out: dict[str, Any] = {"n": 0}
+    for key, _col, _how in specs:
+        out[key] = None
+    try:
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(f"SHOW COLUMNS FROM `{table}`")
+            existing = {r["Field"] for r in cur.fetchall()}
+    except Exception as e:
+        logger.warning("VALD column probe failed %s: %s", table, e)
+        return out
+
+    select_parts = ["COUNT(*) AS n"]
+    aliases: list[tuple[str, str]] = []
+    for key, col, how in specs:
+        if col not in existing:
+            continue
+        fn = "MAX" if how == "max" else "AVG"
+        alias = f"m_{len(aliases)}"
+        select_parts.append(f"{fn}(`{col}`) AS `{alias}`")
+        aliases.append((key, alias))
     sql = f"""
-        SELECT MAX(`{metric_col}`) AS v
+        SELECT {", ".join(select_parts)}
         FROM `{table}`
         WHERE athleteName = %s AND recordedEST BETWEEN %s AND %s
     """
     try:
         with conn.cursor(dictionary=True) as cur:
             cur.execute(sql, (player_name, start, end))
-            row = cur.fetchone()
-            if not row or row.get("v") is None:
-                return None
-            return round(float(row["v"]), 2)
+            row = cur.fetchone() or {}
     except Exception as e:
-        logger.warning("VALD query failed %s.%s: %s", table, metric_col, e)
-        return None
+        logger.warning("VALD agg query failed %s: %s", table, e)
+        return out
+    out["n"] = int(row.get("n") or 0)
+    for key, alias in aliases:
+        out[key] = _vald_round(row.get(alias))
+    return out
+
+
+def _vald_best(conn, table: str, metric_col: str, player_name: str, start: datetime, end: datetime) -> Optional[float]:
+    """Best (MAX) value of a VALD metric for athlete on the assessment day."""
+    got = _vald_table_aggs(
+        conn, table, [("v", metric_col, "max")], player_name, start, end
+    )
+    return got.get("v")
 
 
 def _vald_trial_count(conn, table: str, player_name: str, start: datetime, end: datetime) -> int:
-    sql = f"""
-        SELECT COUNT(*) AS n FROM `{table}`
-        WHERE athleteName = %s AND recordedEST BETWEEN %s AND %s
-    """
-    try:
-        with conn.cursor(dictionary=True) as cur:
-            cur.execute(sql, (player_name, start, end))
-            row = cur.fetchone()
-            return int(row["n"]) if row else 0
-    except Exception as e:
-        logger.warning("VALD count failed %s: %s", table, e)
-        return 0
+    got = _vald_table_aggs(conn, table, [], player_name, start, end)
+    return int(got.get("n") or 0)
 
 
 def aggregate_vald(conn, player_name: str, start: datetime, end: datetime) -> dict[str, Any]:
     """
-    ForceDecks best-of-day metrics for CMJ / SJ / HJ / IMTP.
+    ForceDecks session metrics for CMJ / SJ / HJ / IMTP.
 
-    Returns empty-ish zeros when no trials that day (still reportable).
+    MAX for best-of-day fields; AVG for hop Mean* columns. Missing columns
+    are skipped (None).
     """
-    cmj_n = _vald_trial_count(conn, "VALD_FD_CMJ", player_name, start, end)
-    sj_n = _vald_trial_count(conn, "VALD_FD_SJ", player_name, start, end)
-    hj_n = _vald_trial_count(conn, "VALD_FD_HJ", player_name, start, end)
-    imtp_n = _vald_trial_count(conn, "VALD_FD_IMTP", player_name, start, end)
-    return {
-        "cmj_trials": cmj_n,
-        "cmj_jump_height_ft": _vald_best(
-            conn, "VALD_FD_CMJ", "Jump Height (Flight Time)", player_name, start, end
-        ),
-        "cmj_peak_power_bm": _vald_best(
-            conn, "VALD_FD_CMJ", "Peak Power / BM", player_name, start, end
-        ),
-        "cmj_rsi_mod": _vald_best(
-            conn, "VALD_FD_CMJ", "RSI-modified", player_name, start, end
-        ),
-        "sj_trials": sj_n,
-        "sj_jump_height_ft": _vald_best(
-            conn, "VALD_FD_SJ", "Jump Height (Flight Time)", player_name, start, end
-        ),
-        "sj_peak_power_bm": _vald_best(
-            conn, "VALD_FD_SJ", "Peak Power / BM", player_name, start, end
-        ),
-        "hj_trials": hj_n,
-        "hj_best_rsi": _vald_best(
-            conn, "VALD_FD_HJ", "Best RSI (Jump Height/Contact Time)", player_name, start, end
-        ),
-        "hj_best_jump_height": _vald_best(
-            conn, "VALD_FD_HJ", "Best Jump Height (Flight Time)", player_name, start, end
-        ),
-        "imtp_trials": imtp_n,
-        "imtp_peak_force_bm": _vald_best(
-            conn, "VALD_FD_IMTP", "Peak Vertical Force / BM", player_name, start, end
-        ),
-        "imtp_rfd_100": _vald_best(
-            conn, "VALD_FD_IMTP", "RFD - 100ms", player_name, start, end
-        ),
+    by_table: dict[str, list[tuple[str, str, str]]] = {}
+    for key, table, col, how in VALD_AGG_SPECS:
+        by_table.setdefault(table, []).append((key, col, how))
+
+    out: dict[str, Any] = {}
+    counts = {
+        "VALD_FD_CMJ": "cmj_trials",
+        "VALD_FD_SJ": "sj_trials",
+        "VALD_FD_HJ": "hj_trials",
+        "VALD_FD_IMTP": "imtp_trials",
     }
+    for table, specs in by_table.items():
+        got = _vald_table_aggs(conn, table, specs, player_name, start, end)
+        out[counts[table]] = got.get("n") or 0
+        for key, _col, _how in specs:
+            out[key] = got.get(key)
+    return out
 
 
 # Display label → VALD dictionary metric_name (from vald_dictionary / VALD API).
@@ -931,10 +1024,10 @@ VALD_CARD_CONTEXT: dict[str, str] = {
     ),
 }
 
-# Context shown under each HitTrax / batted-ball chart.
+# Context shown under each batted-ball chart (no source-brand names on the PDF).
 HITTRAX_CHART_CONTEXT: dict[str, str] = {
     "zone_ev": (
-        "Average exit velocity by pitch location (13-zone). Hotter cells are "
+        "Average exit velocity by pitch location. Hotter cells are "
         "where the hitter is driving the ball hardest; dots are individual contacts."
     ),
     "zone_la": (
@@ -944,7 +1037,7 @@ HITTRAX_CHART_CONTEXT: dict[str, str] = {
     "zone_poi": (
         "Average Point of Impact (depth of contact) by pitch location. Negative = "
         "deeper / toward the catcher; positive = out in front of the plate. Same "
-        "13-zone layout as the EV/LA charts."
+        "zone layout as the EV and LA charts."
     ),
     "plate_vert": (
         "Catcher's view of contact height × lateral location (inch markers), "
@@ -957,9 +1050,10 @@ HITTRAX_CHART_CONTEXT: dict[str, str] = {
         "average exit velo at each depth."
     ),
     "ev_la": (
-        "Each batted ball is plotted twice: filled circles are exit velocity (left axis), "
-        "open diamonds are distance (right axis). X is launch angle. Color is flight type "
-        "(GB / LD / FB / PU). No session-level fit — a larger-sample model comes later."
+        "One marker per batted ball: launch angle on X, exit velocity on Y. "
+        "Color is batted-ball type (GB / LD / FB / PU). Distance lives on the spray "
+        "chart so each contact is not plotted twice here. No session-level fit — "
+        "a larger-sample model comes later."
     ),
     "spray": (
         "Field spray of batted balls (direction × distance), colored by exit velocity. "
@@ -1037,6 +1131,202 @@ def vald_definitions_for_report(conn) -> list[dict[str, str]]:
     return rows
 
 
+_PLAYER_DIR_META: dict[str, Any] = {"probed": False}
+
+
+def _player_directory_meta(conn) -> Optional[dict[str, str]]:
+    """
+    Discover player_directory table + name/dob/height/weight columns.
+
+    Cached per process. Returns None if the table is missing.
+    """
+    if _PLAYER_DIR_META.get("probed"):
+        return _PLAYER_DIR_META.get("meta")
+    _PLAYER_DIR_META["probed"] = True
+    _PLAYER_DIR_META["meta"] = None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SHOW TABLES LIKE 'player_directory'")
+            if not cur.fetchone():
+                logger.info("player_directory table not found; PDF bio fields will be blank")
+                return None
+            cur.execute("SHOW COLUMNS FROM player_directory")
+            cols = [str(r[0]) for r in (cur.fetchall() or [])]
+    except Exception as e:
+        logger.warning("player_directory probe failed: %s", e)
+        return None
+
+    lower = {c.lower(): c for c in cols}
+
+    def _pick(*candidates: str) -> Optional[str]:
+        for name in candidates:
+            if name in lower:
+                return lower[name]
+        return None
+
+    name_cols: list[str] = []
+    for cand in (
+        "player_name",
+        "full_name",
+        "name",
+        "athlete_name",
+        "hittrax_username",
+        "norm_name",
+    ):
+        col = _pick(cand)
+        if col and col not in name_cols:
+            name_cols.append(col)
+    first_col = _pick("first_name", "firstname", "first")
+    last_col = _pick("last_name", "lastname", "last")
+    dob_col = _pick("date_of_birth", "dob", "birth_date", "birthdate", "birthday")
+    height_col = _pick("height", "ht", "height_in", "height_inches")
+    weight_col = _pick("weight", "wt", "weight_lbs", "weight_lb")
+    if not name_cols and not (first_col and last_col):
+        logger.warning(
+            "player_directory has no recognizable name column(s); columns=%s",
+            cols,
+        )
+        return None
+    meta = {
+        "name": name_cols[0] if name_cols else "",
+        "names": name_cols,
+        "first": first_col or "",
+        "last": last_col or "",
+        "dob": dob_col or "",
+        "height": height_col or "",
+        "weight": weight_col or "",
+    }
+    _PLAYER_DIR_META["meta"] = meta
+    return meta
+
+
+def _parse_dob(dob: Any) -> Optional[date]:
+    if isinstance(dob, datetime):
+        return dob.date()
+    if isinstance(dob, date):
+        return dob
+    if isinstance(dob, str) and dob.strip():
+        try:
+            return datetime.strptime(dob.strip()[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    return None
+
+
+def _format_age_years_months(dob: Any, on_date: Any) -> Optional[str]:
+    """Age on the assessment day as years + months (e.g. '17 yrs 4 mos')."""
+    dob_d = _parse_dob(dob)
+    if dob_d is None:
+        return None
+    try:
+        on = _as_date(on_date) if on_date else date.today()
+    except (TypeError, ValueError):
+        on = date.today()
+    if on < dob_d:
+        return None
+    years = on.year - dob_d.year
+    months = on.month - dob_d.month
+    if on.day < dob_d.day:
+        months -= 1
+    if months < 0:
+        years -= 1
+        months += 12
+    parts = []
+    if years:
+        parts.append(f"{years} yr" if years == 1 else f"{years} yrs")
+    if months or not parts:
+        parts.append(f"{months} mo" if months == 1 else f"{months} mos")
+    return " ".join(parts)
+
+
+def _player_name_match_variants(player_name: str) -> list[str]:
+    """Exact, spaced, and underscored forms for player_directory.norm_name etc."""
+    raw = (player_name or "").strip()
+    if not raw:
+        return []
+    spaced = re.sub(r"[^a-z0-9]+", " ", raw.lower()).strip()
+    underscored = re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")
+    out: list[str] = []
+    for v in (raw, spaced, underscored):
+        if v and v not in out:
+            out.append(v)
+    return out
+
+
+def lookup_player_directory_bio(conn, player_name: str, on_date: Any = None) -> dict[str, Any]:
+    """
+    Height / weight / age (years and months on the assessment day) from PlayerDev.player_directory.
+
+    Missing table, columns, or row → empty strings printed as — on the PDF.
+    """
+    empty = {
+        "height": None,
+        "weight": None,
+        "date_of_birth": None,
+        "age_display": None,
+    }
+    name = (player_name or "").strip()
+    if not name:
+        return empty
+    meta = _player_directory_meta(conn)
+    if not meta:
+        return empty
+    select_bits = []
+    for key in ("height", "weight", "dob"):
+        col = meta.get(key) or ""
+        if col:
+            select_bits.append(f"`{col}` AS `{key}`")
+    if not select_bits:
+        return empty
+    variants = _player_name_match_variants(name)
+    where_sql = []
+    params: list[Any] = []
+    name_cols = list(meta.get("names") or [])
+    if meta.get("name") and meta["name"] not in name_cols:
+        name_cols.insert(0, meta["name"])
+    for col in name_cols:
+        placeholders = ", ".join(["%s"] * len(variants))
+        where_sql.append(f"LOWER(TRIM(`{col}`)) IN ({placeholders})")
+        params.extend(v.lower() for v in variants)
+    if meta.get("first") and meta.get("last"):
+        placeholders = ", ".join(["%s"] * len(variants))
+        where_sql.append(
+            f"LOWER(TRIM(CONCAT(`{meta['first']}`, ' ', `{meta['last']}`))) "
+            f"IN ({placeholders})"
+        )
+        params.extend(v.lower() for v in variants)
+        where_sql.append(
+            f"LOWER(TRIM(CONCAT(`{meta['last']}`, ', ', `{meta['first']}`))) "
+            f"IN ({placeholders})"
+        )
+        params.extend(v.lower() for v in variants)
+    if not where_sql:
+        return empty
+    sql = f"SELECT {', '.join(select_bits)} FROM player_directory WHERE {' OR '.join(where_sql)} LIMIT 1"
+    try:
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(sql, tuple(params))
+            row = cur.fetchone()
+    except Exception as e:
+        logger.warning("player_directory lookup failed for %s: %s", name, e)
+        return empty
+    if not row:
+        return empty
+    dob = row.get("dob")
+    height = row.get("height")
+    weight = row.get("weight")
+    if height is not None:
+        height = str(height).strip() or None
+    if weight is not None:
+        weight = str(weight).strip() or None
+    return {
+        "height": height,
+        "weight": weight,
+        "date_of_birth": dob,
+        "age_display": _format_age_years_months(dob, on_date),
+    }
+
+
 def metrics_for_assessment(conn, row: dict, *, include_chart_series: bool = False) -> dict[str, Any]:
     """Blast + HitTrax + VALD aggregates for a single hitting_assessments row."""
     start, end = _window_bounds(row)
@@ -1055,6 +1345,7 @@ def metrics_for_assessment(conn, row: dict, *, include_chart_series: bool = Fals
         "assessment_type": row.get("assessment_type"),
         "assessment_date": row.get("assessment_date"),
         "retest_number": retest_number_for(conn, row),
+        "trainer_name": row.get("trainer_name"),
         "notes": row.get("notes"),
         "video_analysis_url": row.get("video_analysis_url"),
         "start_ts": start,
@@ -1102,9 +1393,25 @@ def build_report_bundle(conn, current: dict) -> dict[str, Any]:
             current.get("video_analysis_url")
             or current_metrics.get("video_analysis_url")
         ),
+        "mechanical_summary": current.get("mechanical_summary"),
+        "training_focus": current.get("training_focus"),
+        "best_of_day_summary": current.get("best_of_day_summary"),
+        "player_bio": lookup_player_directory_bio(
+            conn,
+            current.get("player_name") or "",
+            current.get("assessment_date"),
+        ),
         "vald_definitions": vald_defs,
         "vald_card_context": VALD_CARD_CONTEXT,
         "hittrax_chart_context": HITTRAX_CHART_CONTEXT,
+        "wellness": report_wellness.wellness_for_assessment(
+            conn,
+            current.get("player_name") or "",
+            current.get("assessment_date"),
+            (peers["previous"] or {}).get("assessment_date")
+            if peers.get("previous")
+            else None,
+        ),
     }
 
 

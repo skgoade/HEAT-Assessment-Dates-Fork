@@ -77,3 +77,10 @@ Thumbs.db
 docs/STATIC_SITE_*_PLAN.md
 docs/STATIC_SITE_*_OVERVIEW.md
 
+# Experimental notebooks and sample CSVs (keep local)
+notebooks/*_debug.ipynb
+notebooks/*_preview.ipynb
+notebooks/*_explore.ipynb
+notebooks/*.csv
+notebooks/wellness_readiness_report.ipynb
+

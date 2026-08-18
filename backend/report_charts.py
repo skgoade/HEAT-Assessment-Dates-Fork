@@ -114,26 +114,19 @@ def _ols_quadratic(xs: list[float], ys: list[float]) -> Optional[tuple[float, fl
 
 def _ev_la_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
     """
-    Launch angle on x; exit velocity (left y) and distance (right y).
+    Launch angle on x, exit velocity on y; one marker per batted ball.
 
-    No session-level fit — wait for a larger-sample model before overlaying
-    predicted carry / peak-LA analysis.
+    Color is batted-ball type (GB / LD / FB / PU). Distance is not plotted as a
+    second series — that would duplicate each record.
     """
-    rows: list[tuple[float, float, Optional[float]]] = []
+    rows: list[tuple[float, float]] = []
     for c in contacts:
         la = c.get("launch_angle")
         ev = c.get("ev")
         if la is None or ev is None:
             continue
-        dist = c.get("distance")
         try:
-            rows.append(
-                (
-                    float(la),
-                    float(ev),
-                    float(dist) if dist is not None else None,
-                )
-            )
+            rows.append((float(la), float(ev)))
         except (TypeError, ValueError):
             continue
     if not rows:
@@ -146,8 +139,8 @@ def _ev_la_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
     fig, ax = plt.subplots(figsize=(5.2, 4.4))
 
     for name, lo, hi, color in FLIGHT_BINS:
-        xs = [la for la, ev, _ in rows if lo <= la < hi]
-        ys = [ev for la, ev, _ in rows if lo <= la < hi]
+        xs = [la for la, ev in rows if lo <= la < hi]
+        ys = [ev for la, ev in rows if lo <= la < hi]
         if xs:
             ax.scatter(
                 xs,
@@ -163,43 +156,9 @@ def _ev_la_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
 
     ax.set_xlabel("Launch angle (°)")
     ax.set_ylabel("Exit velocity (mph)")
-    ax.set_title("EV & Distance × Launch Angle", pad=10)
     ax.grid(True, linestyle=":", alpha=0.4)
     pad = max(4.0, (max(las) - min(las)) * 0.06)
     ax.set_xlim(min(las) - pad, max(las) + pad)
-
-    dist_rows = [(la, d) for la, _, d in rows if d is not None and d > 0]
-    legend_extra: list = []
-    if dist_rows:
-        ax2 = ax.twinx()
-        ax2.scatter(
-            [p[0] for p in dist_rows],
-            [p[1] for p in dist_rows],
-            marker="D",
-            facecolors="none",
-            edgecolors="#0284c7",
-            s=32,
-            linewidths=1.05,
-            zorder=2,
-            label="Distance",
-        )
-        ax2.set_ylabel("Distance (ft)", fontsize=9, color="#0284c7")
-        ax2.tick_params(axis="y", labelsize=8, colors="#0284c7")
-        ax2.spines["right"].set_color("#7dd3fc")
-        ax2.set_ylim(bottom=0)
-        legend_extra.append(
-            Line2D(
-                [0],
-                [0],
-                marker="D",
-                color="w",
-                markerfacecolor="none",
-                markeredgecolor="#0284c7",
-                markersize=7,
-                markeredgewidth=1.2,
-                label="Distance",
-            )
-        )
 
     flight_handles = [
         Line2D(
@@ -215,17 +174,17 @@ def _ev_la_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
         for name, _, _, col in FLIGHT_BINS
     ]
     fig.legend(
-        handles=flight_handles + legend_extra,
+        handles=flight_handles,
         loc="upper center",
         bbox_to_anchor=(0.5, 0.98),
-        ncol=5 if legend_extra else 4,
+        ncol=4,
         fontsize=7,
         frameon=False,
-        title="Flight (circles) · Distance (diamonds)",
+        title="Batted ball type",
         title_fontsize=8,
         borderaxespad=0,
     )
-    fig.subplots_adjust(top=0.82, bottom=0.12, left=0.12, right=0.86)
+    fig.subplots_adjust(top=0.86, bottom=0.12, left=0.12, right=0.92)
 
     data = _png_bytes(fig)
     _close(fig)
@@ -277,7 +236,8 @@ def _spray_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
     ax.plot([0, 0], [0, max_r], color=MUTED, lw=0.8, alpha=0.45, ls=":", zorder=1)
 
     theta = np.linspace(math.radians(-45), math.radians(45), 80)
-    label_ang = math.radians(14)
+    # Just outside the LF foul line so labels don't sit on batted balls.
+    label_ang = math.radians(-52)
     for radius in distance_rings:
         ax.plot(
             radius * np.sin(theta),
@@ -293,9 +253,10 @@ def _spray_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
             f"{radius} ft",
             fontsize=7,
             color=MUTED,
-            ha="left",
-            va="bottom",
-            zorder=2,
+            ha="right",
+            va="center",
+            zorder=4,
+            clip_on=False,
         )
 
     # Home plate marker at origin
@@ -323,9 +284,8 @@ def _spray_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
     cbar = fig.colorbar(sc, ax=ax, fraction=0.04, pad=0.02)
     cbar.set_label("EV (mph)", fontsize=8)
     ax.set_aspect("equal", adjustable="box")
-    ax.set_xlim(-max_r, max_r)
+    ax.set_xlim(-max_r * 1.28, max_r)
     ax.set_ylim(-max_r * 0.05, max_r)
-    ax.set_title("Spray chart", fontsize=12)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
@@ -547,7 +507,7 @@ def _draw_home_plate_unit(ax, *, zorder: int = 4) -> None:
     )
 
 
-def _zone_heatmap(contacts: list[dict[str, Any]], metric: str, title: str, unit: str) -> Optional[bytes]:
+def _zone_heatmap(contacts: list[dict[str, Any]], metric: str, unit: str) -> Optional[bytes]:
     """
     Zone averages from HitTrax QD (with PP1/PP2 geometric fallback);
     scatter dots from PP1/PP2 plate-crossing position.
@@ -661,7 +621,6 @@ def _zone_heatmap(contacts: list[dict[str, Any]], metric: str, title: str, unit:
     for spine in ax.spines.values():
         spine.set_color("white")
         spine.set_linewidth(1.2)
-    ax.set_title(title, color="white", fontsize=11, pad=8)
     fig.patch.set_facecolor(DARK_BG)
     data = _png_bytes(fig, facecolor=DARK_BG)
     _close(fig)
@@ -792,7 +751,6 @@ def _zone_poi_heatmap(contacts: list[dict[str, Any]]) -> Optional[bytes]:
     for spine in ax.spines.values():
         spine.set_color("white")
         spine.set_linewidth(1.2)
-    ax.set_title("Average POI", color="white", fontsize=13, pad=8)
     fig.patch.set_facecolor(DARK_BG)
     data = _png_bytes(fig, facecolor=DARK_BG)
     _close(fig)
@@ -890,7 +848,6 @@ def _plate_vertical_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
     ax.grid(True, which="major", color="white", alpha=0.18, linewidth=0.6, zorder=1)
     for spine in ax.spines.values():
         spine.set_color("white")
-    ax.set_title("Contact location (vertical)", color="white", fontsize=11, pad=8)
     ax.set_xlabel("← Glove   Plate   Arm →", color="#9ca3af", fontsize=7, labelpad=4)
     ax.set_ylabel("Height", color="#9ca3af", fontsize=7)
     fig.patch.set_facecolor(DARK_BG)
@@ -988,7 +945,6 @@ def _plate_horizontal_chart(contacts: list[dict[str, Any]]) -> Optional[bytes]:
 
     for spine in ax.spines.values():
         spine.set_color("white")
-    ax.set_title("EV by Depth of Contact", color="white", fontsize=11, pad=8)
     ax.set_xlabel("← Glove   Plate   Arm →", color="#9ca3af", fontsize=7, labelpad=4)
     ax.set_ylabel("Depth (out front +, deep −)", color="#9ca3af", fontsize=7)
     fig.patch.set_facecolor(DARK_BG)
@@ -1009,11 +965,8 @@ def build_hittrax_chart_images(contacts: list[dict[str, Any]]) -> dict[str, byte
     builders = [
         ("ev_la", lambda: _ev_la_chart(contacts)),
         ("spray", lambda: _spray_chart(contacts)),
-        ("zone_ev", lambda: _zone_heatmap(contacts, "ev", "Average Exit Velocity by Zone", "mph")),
-        (
-            "zone_la",
-            lambda: _zone_heatmap(contacts, "launch_angle", "Average Launch Angle by Zone", "°"),
-        ),
+        ("zone_ev", lambda: _zone_heatmap(contacts, "ev", "mph")),
+        ("zone_la", lambda: _zone_heatmap(contacts, "launch_angle", "°")),
         ("zone_poi", lambda: _zone_poi_heatmap(contacts)),
         ("plate_vert", lambda: _plate_vertical_chart(contacts)),
         ("plate_horiz", lambda: _plate_horizontal_chart(contacts)),

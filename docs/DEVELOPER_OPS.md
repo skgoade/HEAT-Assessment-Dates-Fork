@@ -1,7 +1,8 @@
-# HEAT Assessment API — ops checklist (Noah / deployers)
+# HEAT Assessment API — ops checklist
 
 ## Service
-- **New** Cloud Run service: `heat-assessment-api` (do not overwrite legacy `hitting-assessment-api`)
+
+- **New** Cloud Run service: `heat-assessment-api` 
 - Region: `us-east4`
 - Image: `gcr.io/norse-coral-441421-r9/heat-assessment-api`
 
@@ -14,10 +15,13 @@ gcloud builds submit --config cloudbuild.yaml .
 ```
 
 The Cloud Build service account needs:
+
 - Artifact Registry Writer (or Editor) to push the image
 - Cloud Run Admin
 - Service Account User on the Cloud Run runtime SA
 - Secret Manager Secret Accessor for DB_* secrets
+
+
 
 ## IAM for human deployers (optional)
 
@@ -33,6 +37,8 @@ gcloud projects add-iam-policy-binding norse-coral-441421-r9 \
   --role="roles/run.admin"
 ```
 
+
+
 ## SQL migrations (PlayerDev) — run once each if missing
 
 ```bash
@@ -41,17 +47,36 @@ gcloud projects add-iam-policy-binding norse-coral-441421-r9 \
 
 # PDF version history — REQUIRED before version rows persist (API falls back to latest URI until applied)
 # deployment/assessment_report_versions.sql
+
+# Per-phase mechanics notes (JSON) for PDF phase cards
+# deployment/hitting_assessments_mechanics_phase_notes.sql
+
+# Mechanical Summary + Best of Day Summary text boxes on the PDF
+# deployment/hitting_assessments_pdf_summaries.sql
+
+# Training Focus card on PDF page 1
+# deployment/hitting_assessments_training_focus.sql
+
+# player_directory height/weight for the PDF header (probe columns first)
+# deployment/player_directory_height_weight.sql
 ```
 
-Verify with [`deployment/verify_heat_schema.sql`](../deployment/verify_heat_schema.sql):
+Verify with `[deployment/verify_heat_schema.sql](../deployment/verify_heat_schema.sql)`:
 
 ```sql
 SHOW TABLES LIKE 'assessment_attachments';
 SHOW TABLES LIKE 'assessment_report_versions';
+SHOW COLUMNS FROM hitting_assessments LIKE 'mechanics_phase_notes';
+SHOW COLUMNS FROM hitting_assessments LIKE 'mechanical_summary';
+SHOW COLUMNS FROM hitting_assessments LIKE 'best_of_day_summary';
+SHOW COLUMNS FROM hitting_assessments LIKE 'training_focus';
 ```
 
 **Status (2026-08-08):** `assessment_attachments` is live. `assessment_report_versions` was **not** present yet — run that SQL on PlayerDev, then redeploy is optional (code already tolerates missing table for reads).
 
+**Status (2026-08-13):** run `hitting_assessments_mechanics_phase_notes.sql` before using phase-card notes (create/regen will fail SELECT/INSERT until the column exists).
+
+**Status (2026-08-14):** run `hitting_assessments_pdf_summaries.sql` before Mechanical Observation / Best of Day Summary persist. Run `hitting_assessments_training_focus.sql` before Training Focus persists. Run `player_directory_height_weight.sql` after probing `SHOW COLUMNS FROM player_directory` (skip if height/weight already exist).
 ## GCS bucket `heat-assessment-reports`
 
 - Keep **private** (signed URLs from the API).
@@ -81,9 +106,12 @@ Optional: set `HEAT_GCS_SIGNER_SA` on Cloud Run to that SA email if auto-detect 
 <script>window.HEAT_API_BASE = 'https://heat-assessment-api-….run.app';</script>
 ```
 
-3. Publish the updated form HTML to the static host / GCS form bucket.
-4. Health: `curl https://…/health`
+1. Publish the updated form HTML to the static host / GCS form bucket.
+2. Health: `curl https://…/health`
+
+
 
 ## Product sign-off
 
-- **EV × LA optimal LA band**: hang-time proxy in `backend/report_charts.py` (documented in `docs/TRAINER_GUIDE.md`). Confirm or replace with Noah’s preferred rule.
+- **EV × LA**: dual y-axis (EV mph + distance ft) vs launch angle in `backend/report_charts.py`. Session-level predicted-carry / peak-LA overlay is deferred until a larger-sample model exists.
+

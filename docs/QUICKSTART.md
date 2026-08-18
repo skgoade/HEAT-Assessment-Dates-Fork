@@ -27,7 +27,7 @@ If your table names or column names are different, edit `deployment/schema.sql` 
 ### Step 2: Deploy Backend (2 minutes)
 
 ```bash
-# Prefer Cloud Build build+deploy (see docs/NOAH_OPS.md)
+# Prefer Cloud Build build+deploy (see docs/DEVELOPER_OPS.md)
 cd backend
 gcloud builds submit --config cloudbuild.yaml .
 cd ..

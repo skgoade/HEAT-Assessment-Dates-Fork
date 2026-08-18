@@ -40,13 +40,14 @@ Example: no VALD that day → uncheck VALD so empty VALD pages don’t appear.
 - Paste a YouTube / Drive / similar URL.
 - It shows as a clickable link near the top of the PDF.
 
-### 5. Assessment notes (optional)
-- Free-text coach notes. They print at the **end** of the PDF.
-- Light formatting is supported:
-  - `**bold**`, `*italic*`, `` `code` ``
-  - Bullet lists with `- ` or `* `
-  - Numbered lists with `1. `
-  - Headings with `# ` / `## `
+### 5. Page 1 notes (optional)
+- **Mechanical Observation** — left card under the swing sequence.
+- **Training Focus** — right card; bullets (`- item`) work well.
+- **Assessment Notes** — shorter strip under those two cards.
+
+Empty cards still print so the layout stays even. Light formatting is supported: `**bold**`, `*italic*`, `` `code` ``, `- ` bullets, numbered lists, and `# ` headings.
+
+- **Best of Day Summary** — one note for jump / hop / pull tests (later page). Leave blank to omit.
 
 ### 6. Mechanics phase cards (optional)
 Each swing phase gets its own card:
@@ -58,13 +59,14 @@ Each swing phase gets its own card:
 5. Impact  
 
 Per phase you can add:
-- **Notes** (coach cues for that stage — shown on the PDF card)
-- **Up to 3 photos** (Load often needs two stills). Optional short captions label individual photos. Use **↑ ↓** to set left-to-right / first-to-last order on the PDF card.
+- **Status** — Strength / Monitor / Development (green / amber / red badge on the PDF)
+- **Caption** (coach cues for that stage — shown under the photo)
+- **One photo** per phase. PNG/JPEG/WebP, up to 4&nbsp;MB. The PDF shows each photo in the same portrait frame (center-cropped), so landscape or odd-sized uploads still line up.
 
-Cards with notes and/or photos appear on the Mechanics page of the PDF.
+Cards appear in a left-to-right sequence on PDF page 1 (Swing Mechanics).
 
 ### 7. Extra visuals (optional)
-Screenshots (HitTrax exports, VALD cards, etc.). Use ↑ ↓ to set PDF order. Captions are recommended.
+Screenshots and other context images. Use ↑ ↓ to set PDF order. Captions are recommended. Form checkboxes still say Blast / HitTrax / VALD so you can hide empty tool pages; those brand names are not printed on the PDF.
 
 ### 8. Submit
 - Click **Submit Assessment**.
@@ -98,8 +100,8 @@ No need to click Load first (there is still a **Reload from saved assessment** b
 ### Edit before generating
 - Change notes, tools, or video link as needed.
 - **Delete images:** check the ones to remove, then generate — they are deleted when you click Generate PDF.
-- **Reorder phase photos:** use ↑ ↓ in **Images already attached** (within that phase). The new order is saved when you generate.
-- **Add images:** use the mechanics / extra visual rows the same way as on a new submit.
+- **Reorder phase photos:** use ↑ ↓ in **Images already attached** (within that phase). The PDF uses the first photo per phase.
+- **Add images:** one new photo per phase (remove an existing phase photo first if replacing). Extra visuals work the same as on a new submit.
 
 ### Generate
 Click **Generate PDF**. The PDF is rebuilt and uploaded as a **new version** (older PDFs stay available under **PDF version history**). Your browser should **download the PDF automatically**; you can also download any prior version from the history list.
@@ -112,19 +114,19 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 
 | Section | Source |
 |---------|--------|
-| Header (player, visit type, video link) | Form + assessment record |
-| Current snapshot / HitTrax / Blast / VALD tables | That day’s data for checked tools; Δ vs previous/baseline when available |
-| Batted ball profile | HitTrax session totals (EV / LA / distance) |
-| Swing metrics | Blast by bat (Game / Handle / Barrel / Under), side-by-side |
-| Flight & spray | Spray (emphasized) + EV×LA |
-| Batted ball by location | Avg EV / LA / distance by pull–middle–oppo and by zone, then zone EV/LA maps |
-| Contact location | Plate (vertical + depth) and square average-POI zone chart |
-| VALD charts + metric definitions | Auto from VALD when enabled |
-| Mechanics phase cards | Your per-phase notes + photos |
+| Page 1 header (athlete, date, type, trainer, video, height, weight, age, handedness) | Form + `player_directory` + that day’s handedness |
+| Swing sequence + Mechanical Observation / Training Focus / Assessment Notes | Phase photos/status/captions + the three page-1 cards |
+| Batted Ball Profile (4 KPI cards + table) | That day’s batted-ball totals; ▲▼ vs previous |
+| Swing Metrics | Blast by bat (Game / Handle / Barrel / Under), side-by-side |
+| Batted ball by location | Location table, then EV/LA zone heatmaps side by side |
+| Contact location | Plate (vertical + depth) and a smaller POI zone chart |
+| Flight & spray | Spray (labeled distance arcs) + EV×LA (dual y) |
+| Best of Day Metrics | Jump / hop / pull KPI cards + one optional summary; trend cards sit with that block |
 | Extra images | Your uploads + captions |
-| Assessment notes | Your notes (end of report) |
 
-**Blast by bat:** swings are grouped from Blast `equipment_name` / nickname into **Game Bat**, **Handle Load**, **Barrel Load**, and **Under Load** (substring match; anything else counts as Game Bat). The PDF shows one side-by-side Swing Metrics table so all bats line up for comparison (current date + Δ previous + Δ initial under each bat). Snapshot peak bat speed prefers Game Bat when multiple bats were used.
+The PDF does **not** print HitTrax / Blast / VALD brand names. Form tool checkboxes still use those names so you can omit empty pages.
+
+**Blast by bat:** swings are grouped from Blast `equipment_name` / nickname into **Game Bat**, **Handle Load**, **Barrel Load**, and **Under Load** (substring match; anything else counts as Game Bat). The PDF shows one side-by-side Swing Metrics table so all bats line up for comparison (current date + Δ previous + Δ initial under each bat).
 
 **EV × LA:** launch angle on the x-axis; exit velocity (left) and distance (right). Circles are EV by flight type; diamonds are distance. No predicted-carry / peak-LA overlay yet — that waits on a larger-sample model.
 
@@ -152,4 +154,4 @@ If player + visit lookup finds nothing, create a **new** assessment at the top o
 - Form or PDF errors → note the assessment ID and what you clicked, and contact whoever maintains the HEAT assessment backend.
 - Download fails → confirm you’re on the published form (points at `heat-assessment-api`) and try the **Download PDF** button again.
 
-For engineering setup (database, deploy, API), see [QUICKSTART.md](QUICKSTART.md), [NOAH_OPS.md](NOAH_OPS.md), and the repo [README](../README.md).
+For engineering setup (database, deploy, API), see [QUICKSTART.md](QUICKSTART.md), [DEVELOPER_OPS.md](DEVELOPER_OPS.md), and the repo [README](../README.md).

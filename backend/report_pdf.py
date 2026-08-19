@@ -113,6 +113,17 @@ def _fmt(val: Any) -> str:
     return str(val)
 
 
+def _kpi_value_and_unit(value: Any, unit: str) -> tuple[str, str]:
+    """Degree marks sit beside the number; other units stay on the line below."""
+    unit = (unit or "").strip()
+    shown = _fmt(value)
+    if unit in {"°", "º"}:
+        if shown != "—":
+            shown = f"{shown}{unit}"
+        return shown, ""
+    return shown, unit
+
+
 def _ordinal(n: int) -> str:
     if 10 <= (n % 100) <= 20:
         suffix = "th"
@@ -1133,13 +1144,21 @@ def _fit_image(raw: bytes, max_width: float, max_height: float) -> Optional[Imag
         return None
 
 
-# Portrait well for page-1 phase photos (matches the filled Peele 2026-01-12 cards).
+# Portrait 9:16 well — phone-still height. Notes min-heights below drop by the
+# same delta from the old 1.55" well so the sequence + notes stay on page 1.
 PHASE_PHOTO_WIDTH = 7.1 * inch / 5 - 0.12 * inch
-PHASE_PHOTO_HEIGHT = 1.55 * inch
+PHASE_PHOTO_HEIGHT = PHASE_PHOTO_WIDTH * 16 / 9
+PAGE1_NOTES_TOP_H = 1.50 * inch
+PAGE1_NOTES_BOTTOM_H = 0.88 * inch
 
 
-def _cover_jpeg(raw: bytes, width_pt: float, height_pt: float) -> Optional[bytes]:
-    """EXIF-correct, center-crop to the frame, return JPEG bytes."""
+def _cover_jpeg(
+    raw: bytes,
+    width_pt: float,
+    height_pt: float,
+    crop: Any = None,
+) -> Optional[bytes]:
+    """EXIF-correct, crop to the frame (center if no crop), return JPEG bytes."""
     try:
         from PIL import Image as PILImage, ImageOps
     except ImportError:
@@ -1162,15 +1181,56 @@ def _cover_jpeg(raw: bytes, width_pt: float, height_pt: float) -> Optional[bytes
         if sw <= 0 or sh <= 0 or height_pt <= 0:
             return None
         target = width_pt / height_pt
-        src = sw / sh
-        if src > target:
-            new_w = max(1, int(round(sh * target)))
-            left = (sw - new_w) // 2
-            im = im.crop((left, 0, left + new_w, sh))
-        elif src < target:
-            new_h = max(1, int(round(sw / target)))
-            top = (sh - new_h) // 2
-            im = im.crop((0, top, sw, top + new_h))
+        box = None
+        parsed = None
+        if crop:
+            try:
+                import attachments as attachments_mod
+
+                parsed = attachments_mod.parse_crop(crop)
+            except Exception:
+                parsed = None
+        if parsed:
+            left = int(round(parsed["x"] * sw))
+            top = int(round(parsed["y"] * sh))
+            right = int(round((parsed["x"] + parsed["w"]) * sw))
+            bottom = int(round((parsed["y"] + parsed["h"]) * sh))
+            left = max(0, min(left, sw - 1))
+            top = max(0, min(top, sh - 1))
+            right = max(left + 1, min(right, sw))
+            bottom = max(top + 1, min(bottom, sh))
+            box = (left, top, right, bottom)
+        if box is None:
+            src = sw / sh
+            if src > target:
+                new_w = max(1, int(round(sh * target)))
+                left = (sw - new_w) // 2
+                box = (left, 0, left + new_w, sh)
+            elif src < target:
+                new_h = max(1, int(round(sw / target)))
+                top = (sh - new_h) // 2
+                box = (0, top, sw, top + new_h)
+        if box:
+            left, top, right, bottom = box
+            bw, bh = right - left, bottom - top
+            if bw > 0 and bh > 0 and abs(bw / bh - target) > 0.02:
+                cx = (left + right) / 2.0
+                cy = (top + bottom) / 2.0
+                if bw / bh > target:
+                    bh2 = min(float(sh), bw / target)
+                    bw2 = bh2 * target
+                else:
+                    bw2 = min(float(sw), bh * target)
+                    bh2 = bw2 / target
+                left = max(0.0, min(cx - bw2 / 2.0, sw - bw2))
+                top = max(0.0, min(cy - bh2 / 2.0, sh - bh2))
+                box = (
+                    int(round(left)),
+                    int(round(top)),
+                    int(round(left + bw2)),
+                    int(round(top + bh2)),
+                )
+            im = im.crop(box)
         px_w = max(1, int(round(width_pt / inch * 220)))
         px_h = max(1, int(round(height_pt / inch * 220)))
         im = im.resize((px_w, px_h), PILImage.Resampling.LANCZOS)
@@ -1184,11 +1244,17 @@ def _cover_jpeg(raw: bytes, width_pt: float, height_pt: float) -> Optional[bytes
 class _PhasePhotoFrame(Flowable):
     """Fixed-size portrait well so every phase card uses the same photo frame."""
 
-    def __init__(self, raw: Optional[bytes], width: float, height: float):
+    def __init__(
+        self,
+        raw: Optional[bytes],
+        width: float,
+        height: float,
+        crop: Any = None,
+    ):
         Flowable.__init__(self)
         self.frame_w = width
         self.frame_h = height
-        self._jpeg = _cover_jpeg(raw, width, height) if raw else None
+        self._jpeg = _cover_jpeg(raw, width, height, crop=crop) if raw else None
         self._raw = raw if raw and not self._jpeg else None
 
     def wrap(self, availWidth, availHeight):
@@ -1822,14 +1888,14 @@ def _kpi_card_grid(
     cells: list = []
     for card in cards:
         label = escape((card.get("label") or "").upper())
-        unit = escape((card.get("unit") or "").strip())
+        shown, unit = _kpi_value_and_unit(card.get("value"), card.get("unit") or "")
         value = card.get("value")
         bits = [
             Paragraph(label, label_style),
-            Paragraph(_fmt(value), value_style),
+            Paragraph(shown, value_style),
         ]
         if unit:
-            bits.append(Paragraph(unit, unit_style))
+            bits.append(Paragraph(escape(unit), unit_style))
         foot = (card.get("foot") or "").strip()
         if foot:
             bits.append(Paragraph(escape(foot), unit_style))
@@ -2178,12 +2244,67 @@ def _page1_notes_block(
     notes: str,
     styles,
 ) -> list:
-    """Two tall cards on top, shorter Assessment Notes strip below."""
+    """
+    Notes under the swing sequence.
+
+    Empty cards are omitted. One filled card uses the full width and height
+    of that block. Two filled cards stack full-width. All three keep the
+    current two-up + Assessment Notes strip layout.
+    """
     page_w = 7.1 * inch
     gap = 0.12 * inch
     top_w = (page_w - gap) / 2
-    top_h = 2.2 * inch
-    bottom_h = 0.95 * inch
+    top_h = PAGE1_NOTES_TOP_H
+    bottom_h = PAGE1_NOTES_BOTTOM_H
+    stack_gap = 12
+    filled_h = top_h + stack_gap + bottom_h
+    slots = [
+        ("MECHANICAL OBSERVATION", mechanical, True),
+        ("TRAINING FOCUS", training_focus, False),
+        ("ASSESSMENT NOTES", notes, False),
+    ]
+    filled = [
+        (title, text, icon)
+        for title, text, icon in slots
+        if (text or "").strip()
+    ]
+    if not filled:
+        return []
+
+    zero_pad = [
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]
+
+    def _stack(cards: list[tuple[str, str, bool]], card_h: float) -> list:
+        rows: list = []
+        for i, (title, text, icon) in enumerate(cards):
+            if i:
+                rows.append([Spacer(1, stack_gap)])
+            rows.append(
+                [
+                    _notes_card(
+                        title,
+                        text,
+                        styles,
+                        width=page_w,
+                        height=card_h,
+                        icon=icon,
+                    )
+                ]
+            )
+        wrap = Table(rows, colWidths=[page_w])
+        wrap.setStyle(TableStyle(zero_pad))
+        return [wrap]
+
+    if len(filled) == 1:
+        return _stack(filled, filled_h)
+    if len(filled) == 2:
+        return _stack(filled, (filled_h - stack_gap) / 2)
+
     left = _notes_card(
         "MECHANICAL OBSERVATION",
         mechanical,
@@ -2204,13 +2325,6 @@ def _page1_notes_block(
     pair_h = max(left.height, right.height)
     left.match_height(pair_h)
     right.match_height(pair_h)
-    zero_pad = [
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]
     top = Table([[left, "", right]], colWidths=[top_w, gap, top_w])
     top.setStyle(TableStyle(zero_pad))
     bottom = _notes_card(
@@ -2221,7 +2335,7 @@ def _page1_notes_block(
         height=bottom_h,
     )
     wrap = Table(
-        [[top], [Spacer(1, 12)], [bottom]],
+        [[top], [Spacer(1, stack_gap)], [bottom]],
         colWidths=[page_w],
     )
     wrap.setStyle(TableStyle(zero_pad))
@@ -2814,6 +2928,7 @@ def _swing_sequence_table(
                 first["bytes"] if first else None,
                 PHASE_PHOTO_WIDTH,
                 PHASE_PHOTO_HEIGHT,
+                crop=(first or {}).get("crop"),
             )
         )
         if status in PHASE_STATUS_COLORS:
@@ -3104,15 +3219,15 @@ def _collect_story_pages(
         flow.append(
             _swing_sequence_table(mechanics_by_slot, phase_notes_map, styles)
         )
-        flow.append(Spacer(1, 16))
-        flow.extend(
-            _page1_notes_block(
-                mechanical=bundle.get("mechanical_summary") or "",
-                training_focus=bundle.get("training_focus") or "",
-                notes=bundle.get("notes") or current.get("notes") or "",
-                styles=styles,
-            )
+        notes_block = _page1_notes_block(
+            mechanical=bundle.get("mechanical_summary") or "",
+            training_focus=bundle.get("training_focus") or "",
+            notes=bundle.get("notes") or current.get("notes") or "",
+            styles=styles,
         )
+        if notes_block:
+            flow.append(Spacer(1, 16))
+            flow.extend(notes_block)
         out.append(("mechanics", flow))
 
     if (used_hittrax or used_blast) and _wants_page(wanted, "batted_ball"):

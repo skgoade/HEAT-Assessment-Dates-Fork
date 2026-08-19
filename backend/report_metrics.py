@@ -1181,6 +1181,7 @@ def _player_directory_meta(conn) -> Optional[dict[str, str]]:
     dob_col = _pick("date_of_birth", "dob", "birth_date", "birthdate", "birthday")
     height_col = _pick("height", "ht", "height_in", "height_inches")
     weight_col = _pick("weight", "wt", "weight_lbs", "weight_lb")
+    id_col = _pick("player_id", "id", "athlete_id", "directory_id")
     if not name_cols and not (first_col and last_col):
         logger.warning(
             "player_directory has no recognizable name column(s); columns=%s",
@@ -1195,6 +1196,7 @@ def _player_directory_meta(conn) -> Optional[dict[str, str]]:
         "dob": dob_col or "",
         "height": height_col or "",
         "weight": weight_col or "",
+        "id": id_col or "",
     }
     _PLAYER_DIR_META["meta"] = meta
     return meta
@@ -1332,6 +1334,152 @@ def lookup_player_directory_bio(conn, player_name: str, on_date: Any = None) -> 
         "date_of_birth": dob_out,
         "age_display": _format_age_years_months(dob, on_date),
     }
+
+
+def _like_contains(query: str) -> str:
+    escaped = (
+        (query or "")
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    return f"%{escaped}%"
+
+
+def _directory_row_display_name(row: dict[str, Any], meta: dict[str, str]) -> str:
+    concat = str(row.get("display_name") or "").strip()
+    ranked: list[str] = []
+    lower_cols = {str(c).lower(): c for c in (meta.get("names") or [])}
+    for pref in ("full_name", "player_name", "athlete_name", "name"):
+        col = lower_cols.get(pref)
+        if not col:
+            continue
+        val = str(row.get(col) or "").strip()
+        if val:
+            ranked.append(val)
+    for val in ranked:
+        if val:
+            return val
+    if concat:
+        return concat
+    for pref in ("hittrax_username", "norm_name"):
+        col = lower_cols.get(pref)
+        if not col:
+            continue
+        val = str(row.get(col) or "").strip()
+        if val:
+            return val.replace("_", " ")
+    return ""
+
+
+def search_player_roster(conn, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
+    """
+    Typeahead hits from player_directory, then unmatched hitting_assessments names.
+
+    Picking a hit is optional — trainers can still type a name that is not listed.
+    """
+    q = (query or "").strip()
+    if len(q) < 1:
+        return []
+    cap = max(1, min(int(limit or 20), 40))
+    like = _like_contains(q.lower())
+    hits: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def _remember(name: str) -> bool:
+        key = re.sub(r"\s+", " ", (name or "").strip().lower())
+        if not key or key in seen:
+            return False
+        seen.add(key)
+        return True
+
+    meta = _player_directory_meta(conn)
+    if meta:
+        select_bits: list[str] = []
+        if meta.get("id"):
+            select_bits.append(f"`{meta['id']}` AS player_id")
+        for col in meta.get("names") or []:
+            select_bits.append(f"`{col}`")
+        if meta.get("first") and meta.get("last"):
+            select_bits.append(
+                f"CONCAT_WS(' ', `{meta['first']}`, `{meta['last']}`) AS display_name"
+            )
+        where_sql: list[str] = []
+        params: list[Any] = []
+        for col in meta.get("names") or []:
+            where_sql.append(f"LOWER(TRIM(`{col}`)) LIKE %s")
+            params.append(like)
+        if meta.get("first") and meta.get("last"):
+            where_sql.append(
+                f"LOWER(TRIM(CONCAT_WS(' ', `{meta['first']}`, `{meta['last']}`))) LIKE %s"
+            )
+            params.append(like)
+            where_sql.append(f"LOWER(TRIM(`{meta['last']}`)) LIKE %s")
+            params.append(like)
+            where_sql.append(f"LOWER(TRIM(`{meta['first']}`)) LIKE %s")
+            params.append(like)
+        if select_bits and where_sql:
+            sql = (
+                f"SELECT {', '.join(select_bits)} FROM player_directory "
+                f"WHERE {' OR '.join(where_sql)} LIMIT %s"
+            )
+            try:
+                with conn.cursor(dictionary=True) as cur:
+                    cur.execute(sql, tuple(params + [cap]))
+                    rows = cur.fetchall() or []
+            except Exception as e:
+                logger.warning("player_directory roster search failed: %s", e)
+                rows = []
+            for row in rows:
+                name = _directory_row_display_name(row, meta)
+                if not _remember(name):
+                    continue
+                pid = row.get("player_id")
+                try:
+                    pid = int(pid) if pid is not None and str(pid).strip() != "" else None
+                except (TypeError, ValueError):
+                    pid = None
+                hits.append(
+                    {
+                        "name": name,
+                        "player_id": pid,
+                        "source": "directory",
+                    }
+                )
+
+    remaining = cap - len(hits)
+    if remaining > 0:
+        try:
+            with conn.cursor(dictionary=True) as cur:
+                cur.execute(
+                    """
+                    SELECT player_name,
+                           MAX(assessment_id) AS last_id,
+                           MAX(assessment_date) AS last_date
+                    FROM hitting_assessments
+                    WHERE LOWER(TRIM(player_name)) LIKE %s
+                    GROUP BY player_name
+                    ORDER BY last_date DESC, last_id DESC
+                    LIMIT %s
+                    """,
+                    (like, remaining),
+                )
+                prior = cur.fetchall() or []
+        except Exception as e:
+            logger.warning("assessment roster search failed: %s", e)
+            prior = []
+        for row in prior:
+            name = str(row.get("player_name") or "").strip()
+            if not _remember(name):
+                continue
+            hits.append(
+                {
+                    "name": name,
+                    "player_id": None,
+                    "source": "assessment",
+                }
+            )
+    return hits
 
 
 def peek_session_metrics(conn, player_name: str, assessment_date) -> dict[str, Any]:

@@ -1,6 +1,7 @@
 """Trainer visual attachments (images) for assessment PDFs."""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -32,6 +33,65 @@ MECHANICS_PHASE_SLOTS = (
 )
 
 
+_CROP_COL: dict[str, Any] = {"probed": False, "ok": False}
+
+
+def _has_crop_column(conn) -> bool:
+    if _CROP_COL["probed"]:
+        return bool(_CROP_COL["ok"])
+    _CROP_COL["probed"] = True
+    _CROP_COL["ok"] = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SHOW COLUMNS FROM assessment_attachments LIKE 'crop_json'"
+            )
+            _CROP_COL["ok"] = bool(cur.fetchone())
+    except Exception as e:
+        logger.warning("assessment_attachments crop_json probe failed: %s", e)
+    return bool(_CROP_COL["ok"])
+
+
+def parse_crop(raw: Any) -> Optional[dict[str, float]]:
+    """Normalized crop box {x, y, w, h} in 0–1 of the EXIF-corrected image."""
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+    if not isinstance(raw, dict):
+        return None
+    try:
+        x = float(raw.get("x"))
+        y = float(raw.get("y"))
+        w = float(raw.get("w"))
+        h = float(raw.get("h"))
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= x < 1 and 0 <= y < 1 and 0 < w <= 1 and 0 < h <= 1):
+        return None
+    if x + w > 1.0001 or y + h > 1.0001:
+        w = min(w, 1.0 - x)
+        h = min(h, 1.0 - y)
+        if w <= 0 or h <= 0:
+            return None
+    return {
+        "x": round(x, 4),
+        "y": round(y, 4),
+        "w": round(w, 4),
+        "h": round(h, 4),
+    }
+
+
+def dump_crop(crop: Any) -> Optional[str]:
+    parsed = parse_crop(crop)
+    if not parsed:
+        return None
+    return json.dumps(parsed, separators=(",", ":"))
+
+
 def _slug(name: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9]+", "_", (name or "").strip()).strip("_").lower()
     return s or "player"
@@ -45,22 +105,30 @@ def _attachments_local_dir(assessment_id: int) -> Path:
 
 
 def list_attachments(conn, assessment_id: int) -> list[dict[str, Any]]:
+    cols = (
+        "attachment_id, assessment_id, slot, caption, gcs_uri, "
+        "local_path, content_type, sort_order, created_at"
+    )
+    if _has_crop_column(conn):
+        cols += ", crop_json"
     try:
         with conn.cursor(dictionary=True) as cur:
             cur.execute(
-                """
-                SELECT attachment_id, assessment_id, slot, caption, gcs_uri,
-                       local_path, content_type, sort_order, created_at
+                f"""
+                SELECT {cols}
                 FROM assessment_attachments
                 WHERE assessment_id = %s
                 ORDER BY sort_order ASC, attachment_id ASC
                 """,
                 (assessment_id,),
             )
-            return list(cur.fetchall() or [])
+            rows = list(cur.fetchall() or [])
     except Exception as e:
         logger.warning("list_attachments failed (table missing?): %s", e)
         return []
+    for row in rows:
+        row["crop"] = parse_crop(row.get("crop_json"))
+    return rows
 
 
 def save_attachment_row(
@@ -73,24 +141,46 @@ def save_attachment_row(
     local_path: Optional[str],
     content_type: Optional[str],
     sort_order: int,
+    crop: Any = None,
 ) -> int:
+    crop_json = dump_crop(crop) if _has_crop_column(conn) else None
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO assessment_attachments
-                (assessment_id, slot, caption, gcs_uri, local_path, content_type, sort_order)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """,
-            (
-                assessment_id,
-                (slot or "other")[:64],
-                (caption or "").strip()[:512] or None,
-                gcs_uri,
-                local_path,
-                content_type,
-                sort_order,
-            ),
-        )
+        if _has_crop_column(conn):
+            cur.execute(
+                """
+                INSERT INTO assessment_attachments
+                    (assessment_id, slot, caption, gcs_uri, local_path,
+                     content_type, sort_order, crop_json)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    assessment_id,
+                    (slot or "other")[:64],
+                    (caption or "").strip()[:512] or None,
+                    gcs_uri,
+                    local_path,
+                    content_type,
+                    sort_order,
+                    crop_json,
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO assessment_attachments
+                    (assessment_id, slot, caption, gcs_uri, local_path, content_type, sort_order)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    assessment_id,
+                    (slot or "other")[:64],
+                    (caption or "").strip()[:512] or None,
+                    gcs_uri,
+                    local_path,
+                    content_type,
+                    sort_order,
+                ),
+            )
         conn.commit()
         return int(cur.lastrowid)
 
@@ -186,6 +276,35 @@ def update_attachment_captions(
                 WHERE assessment_id = %s AND attachment_id = %s
                 """,
                 (text, assessment_id, aid),
+            )
+            updated.append(aid)
+        conn.commit()
+    return updated
+
+
+def update_attachment_crops(
+    conn,
+    assessment_id: int,
+    crops: dict[int, Any],
+) -> list[int]:
+    """Update crop boxes for attachments that belong to this assessment."""
+    if not crops or not _has_crop_column(conn):
+        return []
+    rows = list_attachments(conn, assessment_id)
+    known = {int(r["attachment_id"]) for r in rows}
+    updated: list[int] = []
+    with conn.cursor() as cur:
+        for raw_id, raw_crop in crops.items():
+            aid = int(raw_id)
+            if aid not in known:
+                continue
+            cur.execute(
+                """
+                UPDATE assessment_attachments
+                SET crop_json = %s
+                WHERE assessment_id = %s AND attachment_id = %s
+                """,
+                (dump_crop(raw_crop), assessment_id, aid),
             )
             updated.append(aid)
         conn.commit()
@@ -290,6 +409,7 @@ def attachments_for_pdf(conn, assessment_id: int) -> list[dict[str, Any]]:
                 "caption": att.get("caption") or "",
                 "content_type": att.get("content_type") or "image/png",
                 "bytes": data,
+                "crop": att.get("crop"),
             }
         )
     return out

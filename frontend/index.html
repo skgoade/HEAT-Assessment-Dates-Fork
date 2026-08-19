@@ -272,7 +272,7 @@
         .visual-preview {
             width: 100%;
             max-width: 168px;
-            aspect-ratio: 130 / 185;
+            aspect-ratio: 1.3 / 1.55;
             background: #0f1720;
             border: 1px solid rgba(255, 255, 255, 0.18);
             border-radius: 6px;
@@ -346,21 +346,59 @@
         }
 
         .mechanics-phase-preview {
+            position: relative;
             width: 100%;
-            max-width: 168px;
-            aspect-ratio: 130 / 185;
+            max-width: 200px;
+            aspect-ratio: 9 / 16;
             background: #0f1720;
             border: 1px solid rgba(255, 255, 255, 0.18);
             border-radius: 6px;
             overflow: hidden;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .mechanics-phase-preview.is-dragging {
+            cursor: grabbing;
         }
 
         .mechanics-phase-preview img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: center;
+            position: absolute;
+            left: 0;
+            top: 0;
+            max-width: none;
+            width: auto;
+            height: auto;
             display: block;
+            pointer-events: none;
+        }
+
+        .mechanics-crop-tools {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .mechanics-crop-tools[hidden] {
+            display: none !important;
+        }
+
+        .mechanics-crop-tools button {
+            width: auto;
+            margin: 0;
+            padding: 4px 10px;
+            font-size: 13px;
+        }
+
+        .mechanics-crop-zoom {
+            flex: 1 1 90px;
+            min-width: 80px;
+            width: auto;
+            margin: 0;
+            padding: 0;
+            accent-color: #fcba39;
         }
 
         .mechanics-remove-photo,
@@ -800,6 +838,51 @@
             min-height: 1.2em;
         }
 
+        .player-combobox {
+            position: relative;
+        }
+
+        .player-suggest {
+            position: absolute;
+            z-index: 20;
+            left: 0;
+            right: 0;
+            top: calc(100% + 4px);
+            margin: 0;
+            padding: 6px 0;
+            list-style: none;
+            max-height: 240px;
+            overflow-y: auto;
+            background: #1a1f3a;
+            border: 1px solid rgba(252, 186, 57, 0.35);
+            border-radius: 10px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        }
+
+        .player-suggest-item {
+            padding: 8px 14px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .player-suggest-item[aria-selected="true"],
+        .player-suggest-item:hover {
+            background: rgba(252, 186, 57, 0.16);
+        }
+
+        .player-suggest-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .player-suggest-meta {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.55);
+        }
+
         @media (max-width: 640px) {
             .container {
                 padding: 24px;
@@ -1049,20 +1132,25 @@
                     <label for="playerName">
                         Player Name<span class="required">*</span>
                     </label>
-                    <input
-                        type="text"
-                        id="playerName"
-                        name="playerName"
-                        placeholder="Enter player name"
-                        list="playerNames"
-                        autocomplete="off"
-                    >
-                    <datalist id="playerNames"></datalist>
-                    <div class="helper-text">Full name of the player being assessed</div>
+                    <div class="player-combobox">
+                        <input
+                            type="text"
+                            id="playerName"
+                            name="playerName"
+                            placeholder="Type to search the roster"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-autocomplete="list"
+                            aria-expanded="false"
+                            aria-controls="playerSuggestList"
+                        >
+                        <ul id="playerSuggestList" class="player-suggest" hidden role="listbox"></ul>
+                    </div>
+                    <div class="helper-text">Pick from the roster as you type, or enter a name that is not listed.</div>
                     <div id="lookupStatus" class="lookup-status"></div>
                     <div class="player-bio-peek is-idle" id="playerBioPeek">
                         <div class="player-bio-peek-note">
-                            Enter a player name to preview height, weight, and age from the player directory (same values as the PDF header).
+                            Enter a player name to preview height, weight, and age from the player directory.
                         </div>
                     </div>
                 </div>
@@ -1159,8 +1247,10 @@
                     <p class="section-intro" style="margin: 0 0 12px;">
                         One card per swing phase (Load Phase → Impact). Choose Strength /
                         Monitor / Development, add a caption, and attach <strong>one photo</strong>
-                        per phase. PNG/JPEG/WebP, up to 4&nbsp;MB each. Photos are shown in a
-                        fixed portrait frame on the PDF (center-cropped to match).
+                        per phase. On a retest, open <strong>Development</strong> badges from the
+                        last visit are pre-selected. PNG/JPEG/WebP, up to 4&nbsp;MB each. Photos fill a
+                        tall phone-like portrait frame on the PDF. Drag to reframe and use the
+                        zoom slider if the automatic crop cuts off the athlete.
                     </p>
                     <div id="mechanicsRows"></div>
                 </div>
@@ -1206,8 +1296,8 @@
                         class="notes-field"
                         placeholder="Eliminate sway in the load"
                     ></textarea>
-                    <div class="helper-text">
-                        Page 1, right card.
+                    <div class="helper-text" id="trainingFocusHint">
+                        Page 1, right card. On a retest, the last visit’s Training Focus is filled in for you to edit.
                     </div>
                 </div>
 
@@ -1293,13 +1383,19 @@
                         <label for="regenPlayerName">
                             Player Name<span class="required">*</span>
                         </label>
-                        <input
-                            type="text"
-                            id="regenPlayerName"
-                            placeholder="Enter player name"
-                            list="playerNames"
-                            autocomplete="off"
-                        >
+                        <div class="player-combobox">
+                            <input
+                                type="text"
+                                id="regenPlayerName"
+                                placeholder="Type to search the roster"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-expanded="false"
+                                aria-controls="regenPlayerSuggestList"
+                            >
+                            <ul id="regenPlayerSuggestList" class="player-suggest" hidden role="listbox"></ul>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="regenVisit">
@@ -1357,8 +1453,9 @@
                 <div class="form-group">
                     <label>Mechanics phase cards (optional)</label>
                     <p class="section-intro" style="margin: 0 0 12px;">
-                        Existing photos load into each phase card. Choose a file to replace,
-                        or remove the photo. Captions stay in the box on the card.
+                        Existing photos load into each phase card. Drag and zoom to
+                        reframe. Choose a file to replace, or remove the photo.
+                        Captions stay in the box on the card.
                         PNG/JPEG/WebP, up to 4&nbsp;MB each, one photo per phase.
                     </p>
                     <button type="button" class="secondary-btn" id="loadAttachmentsBtn">
@@ -1467,6 +1564,208 @@
         const regenMechanicsRowsEl = document.getElementById('regenMechanicsRows');
         let regenPhaseNotesDirty = false;
         let regenPendingDeleteIds = new Set();
+        // Matches PHASE_PHOTO_WIDTH / PHASE_PHOTO_HEIGHT in report_pdf.py (9:16)
+        const PHASE_PHOTO_ASPECT = 9 / 16;
+
+        function coverCropRect(nw, nh) {
+            if (!nw || !nh) return { x: 0, y: 0, w: 1, h: 1 };
+            const imgAspect = nw / nh;
+            if (imgAspect > PHASE_PHOTO_ASPECT) {
+                const w = PHASE_PHOTO_ASPECT / imgAspect;
+                return { x: (1 - w) / 2, y: 0, w, h: 1 };
+            }
+            const h = imgAspect / PHASE_PHOTO_ASPECT;
+            return { x: 0, y: (1 - h) / 2, w: 1, h };
+        }
+
+        function clampCrop(crop, nw, nh) {
+            const cover = coverCropRect(nw, nh);
+            let w = Number(crop && crop.w);
+            let h = Number(crop && crop.h);
+            let x = Number(crop && crop.x);
+            let y = Number(crop && crop.y);
+            if (![w, h, x, y].every(Number.isFinite)) return cover;
+            const aspect = cover.w / cover.h;
+            w = Math.min(Math.max(w, 0.04), cover.w);
+            h = w / aspect;
+            if (h > cover.h) {
+                h = cover.h;
+                w = h * aspect;
+            }
+            x = Math.min(Math.max(x, 0), Math.max(0, 1 - w));
+            y = Math.min(Math.max(y, 0), Math.max(0, 1 - h));
+            return { x, y, w, h };
+        }
+
+        function getCardCrop(card) {
+            try {
+                const raw = card && card.dataset.cropJson;
+                if (!raw) return null;
+                const crop = JSON.parse(raw);
+                if (![crop.x, crop.y, crop.w, crop.h].every(Number.isFinite)) return null;
+                return crop;
+            } catch (err) {
+                return null;
+            }
+        }
+
+        function setCardCrop(card, crop, { dirty = true } = {}) {
+            if (!card || !crop) return;
+            card.dataset.cropJson = JSON.stringify(crop);
+            if (dirty) card.dataset.cropDirty = '1';
+        }
+
+        function cropZoomOf(crop, nw, nh) {
+            const cover = coverCropRect(nw, nh);
+            if (!crop || !crop.w) return 1;
+            return Math.min(3, Math.max(1, cover.w / crop.w));
+        }
+
+        function setPhasePhotoChrome(card, visible) {
+            const tools = card.querySelector('.mechanics-crop-tools');
+            const hint = card.querySelector('.mechanics-crop-hint');
+            if (tools) tools.hidden = !visible;
+            if (hint) hint.hidden = !visible;
+        }
+
+        function applyCropPreview(card) {
+            const preview = card.querySelector('.mechanics-phase-preview');
+            const img = preview && preview.querySelector('img');
+            if (!preview || !img || !img.naturalWidth || preview.hidden) {
+                setPhasePhotoChrome(card, false);
+                return;
+            }
+            const crop = clampCrop(
+                getCardCrop(card) || coverCropRect(img.naturalWidth, img.naturalHeight),
+                img.naturalWidth,
+                img.naturalHeight
+            );
+            card.dataset.cropJson = JSON.stringify(crop);
+            const vw = preview.clientWidth || 200;
+            const scale = vw / (crop.w * img.naturalWidth);
+            img.style.width = `${img.naturalWidth * scale}px`;
+            img.style.height = `${img.naturalHeight * scale}px`;
+            img.style.left = `${-crop.x * img.naturalWidth * scale}px`;
+            img.style.top = `${-crop.y * img.naturalHeight * scale}px`;
+            const slider = card.querySelector('.mechanics-crop-zoom');
+            if (slider) slider.value = String(Math.round(cropZoomOf(crop, img.naturalWidth, img.naturalHeight) * 100));
+            setPhasePhotoChrome(card, true);
+        }
+
+        function setCropZoom(card, zoom) {
+            const preview = card.querySelector('.mechanics-phase-preview');
+            const img = preview && preview.querySelector('img');
+            if (!img || !img.naturalWidth) return;
+            const cover = coverCropRect(img.naturalWidth, img.naturalHeight);
+            const z = Math.min(3, Math.max(1, Number(zoom) || 1));
+            const current = clampCrop(
+                getCardCrop(card) || cover,
+                img.naturalWidth,
+                img.naturalHeight
+            );
+            const w = cover.w / z;
+            const h = cover.h / z;
+            const cx = current.x + current.w / 2;
+            const cy = current.y + current.h / 2;
+            setCardCrop(card, clampCrop(
+                { x: cx - w / 2, y: cy - h / 2, w, h },
+                img.naturalWidth,
+                img.naturalHeight
+            ));
+            applyCropPreview(card);
+        }
+
+        function bindPhaseCrop(card) {
+            const preview = card.querySelector('.mechanics-phase-preview');
+            const img = preview && preview.querySelector('img');
+            const slider = card.querySelector('.mechanics-crop-zoom');
+            const zoomIn = card.querySelector('.mechanics-crop-zoom-in');
+            const zoomOut = card.querySelector('.mechanics-crop-zoom-out');
+            const resetBtn = card.querySelector('.mechanics-crop-reset');
+            if (!preview || !img) return;
+            img.addEventListener('load', () => {
+                if (!getCardCrop(card)) {
+                    card.dataset.cropJson = JSON.stringify(
+                        coverCropRect(img.naturalWidth, img.naturalHeight)
+                    );
+                    delete card.dataset.cropDirty;
+                }
+                applyCropPreview(card);
+            });
+            preview.addEventListener('pointerdown', (e) => {
+                if (preview.hidden || !img.naturalWidth) return;
+                e.preventDefault();
+                preview.classList.add('is-dragging');
+                preview.setPointerCapture(e.pointerId);
+                const crop = clampCrop(
+                    getCardCrop(card) || coverCropRect(img.naturalWidth, img.naturalHeight),
+                    img.naturalWidth,
+                    img.naturalHeight
+                );
+                card._cropDrag = {
+                    x0: e.clientX,
+                    y0: e.clientY,
+                    crop,
+                };
+            });
+            preview.addEventListener('pointermove', (e) => {
+                const drag = card._cropDrag;
+                if (!drag || !img.naturalWidth) return;
+                const vw = preview.clientWidth || 1;
+                const vh = preview.clientHeight || 1;
+                const next = {
+                    ...drag.crop,
+                    x: drag.crop.x - ((e.clientX - drag.x0) / vw) * drag.crop.w,
+                    y: drag.crop.y - ((e.clientY - drag.y0) / vh) * drag.crop.h,
+                };
+                setCardCrop(card, clampCrop(next, img.naturalWidth, img.naturalHeight));
+                applyCropPreview(card);
+            });
+            const endDrag = (e) => {
+                if (!card._cropDrag) return;
+                card._cropDrag = null;
+                preview.classList.remove('is-dragging');
+                try {
+                    preview.releasePointerCapture(e.pointerId);
+                } catch (err) { /* already released */ }
+            };
+            preview.addEventListener('pointerup', endDrag);
+            preview.addEventListener('pointercancel', endDrag);
+            preview.addEventListener('wheel', (e) => {
+                if (preview.hidden || !img.naturalWidth) return;
+                e.preventDefault();
+                const current = cropZoomOf(
+                    getCardCrop(card) || coverCropRect(img.naturalWidth, img.naturalHeight),
+                    img.naturalWidth,
+                    img.naturalHeight
+                );
+                setCropZoom(card, current + (e.deltaY < 0 ? 0.12 : -0.12));
+            }, { passive: false });
+            if (slider) {
+                slider.addEventListener('input', () => {
+                    setCropZoom(card, Number(slider.value) / 100);
+                });
+            }
+            if (zoomIn) {
+                zoomIn.addEventListener('click', () => {
+                    const current = Number(slider && slider.value) / 100 || 1;
+                    setCropZoom(card, current + 0.15);
+                });
+            }
+            if (zoomOut) {
+                zoomOut.addEventListener('click', () => {
+                    const current = Number(slider && slider.value) / 100 || 1;
+                    setCropZoom(card, current - 0.15);
+                });
+            }
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    if (!img.naturalWidth) return;
+                    setCardCrop(card, coverCropRect(img.naturalWidth, img.naturalHeight));
+                    applyCropPreview(card);
+                });
+            }
+        }
 
         function autosizeTextarea(el) {
             if (!el) return;
@@ -1549,6 +1848,13 @@
                         <div class="mechanics-phase-preview" hidden>
                             <img alt="Phase photo preview">
                         </div>
+                        <div class="mechanics-crop-tools" hidden>
+                            <button type="button" class="secondary-btn mechanics-crop-zoom-out" aria-label="Zoom out">−</button>
+                            <input type="range" class="mechanics-crop-zoom" min="100" max="300" value="100" aria-label="Zoom">
+                            <button type="button" class="secondary-btn mechanics-crop-zoom-in" aria-label="Zoom in">+</button>
+                            <button type="button" class="secondary-btn mechanics-crop-reset">Reset</button>
+                        </div>
+                        <p class="helper-text mechanics-crop-hint" hidden>Drag to reframe. Zoom for a tighter crop.</p>
                         <button type="button" class="secondary-btn mechanics-remove-photo" hidden>
                             Remove photo
                         </button>
@@ -1579,10 +1885,17 @@
                     const file = fileInput.files && fileInput.files[0];
                     if (!file) {
                         if (card.dataset.attachmentId) {
+                            if (card.dataset.savedCropJson) {
+                                card.dataset.cropJson = card.dataset.savedCropJson;
+                                delete card.dataset.cropDirty;
+                            }
                             setPreviewImage(preview, previewImg, card.dataset.fileUrl || '');
                             removeBtn.hidden = false;
                         } else {
+                            delete card.dataset.cropJson;
+                            delete card.dataset.cropDirty;
                             setPreviewImage(preview, previewImg, null);
+                            setPhasePhotoChrome(card, false);
                             removeBtn.hidden = true;
                         }
                         return;
@@ -1590,6 +1903,8 @@
                     if (card.dataset.attachmentId) {
                         regenPendingDeleteIds.add(String(card.dataset.attachmentId));
                     }
+                    delete card.dataset.cropJson;
+                    delete card.dataset.cropDirty;
                     setPreviewImage(preview, previewImg, URL.createObjectURL(file), { objectUrl: true });
                     removeBtn.hidden = false;
                 });
@@ -1599,11 +1914,16 @@
                         delete card.dataset.attachmentId;
                         delete card.dataset.fileUrl;
                     }
+                    delete card.dataset.cropJson;
+                    delete card.dataset.savedCropJson;
+                    delete card.dataset.cropDirty;
                     fileInput.value = '';
                     setPreviewImage(preview, previewImg, null);
+                    setPhasePhotoChrome(card, false);
                     removeBtn.hidden = true;
                     markDirty();
                 });
+                bindPhaseCrop(card);
                 container.appendChild(card);
             });
         }
@@ -1619,13 +1939,29 @@
             if (!item) {
                 delete card.dataset.attachmentId;
                 delete card.dataset.fileUrl;
+                delete card.dataset.cropJson;
+                delete card.dataset.savedCropJson;
+                delete card.dataset.cropDirty;
                 setPreviewImage(preview, previewImg, null);
+                setPhasePhotoChrome(card, false);
                 if (removeBtn) removeBtn.hidden = true;
                 return;
             }
             card.dataset.attachmentId = String(item.attachment_id);
             card.dataset.fileUrl = item.file_url || '';
+            if (item.crop) {
+                const cropJson = JSON.stringify(item.crop);
+                card.dataset.cropJson = cropJson;
+                card.dataset.savedCropJson = cropJson;
+            } else {
+                delete card.dataset.cropJson;
+                delete card.dataset.savedCropJson;
+            }
+            delete card.dataset.cropDirty;
             setPreviewImage(preview, previewImg, item.file_url || '');
+            if (previewImg && previewImg.complete && previewImg.naturalWidth) {
+                applyCropPreview(card);
+            }
             if (removeBtn) removeBtn.hidden = false;
             if (notesEl && !(notesEl.value || '').trim() && (item.caption || '').trim()) {
                 notesEl.value = String(item.caption).trim();
@@ -1739,6 +2075,7 @@
                     file,
                     caption: (card.querySelector('.mechanics-phase-notes')?.value || '').trim(),
                     slot,
+                    crop: getCardCrop(card),
                 });
             });
             return items;
@@ -1774,6 +2111,9 @@
                 body.append(`caption${i}`, item.caption || '');
                 body.append(`slot${i}`, item.slot || 'other');
                 body.append(`order${i}`, String(i));
+                if (item.crop) {
+                    body.append(`crop${i}`, JSON.stringify(item.crop));
+                }
             });
             body.append('regenerate', regenerate ? '1' : '0');
             const response = await fetch(`${API_URL}/${assessmentId}/attachments`, {
@@ -2091,6 +2431,19 @@
             return captions;
         }
 
+        function collectExistingCropUpdates() {
+            const crops = {};
+            regenMechanicsRowsEl.querySelectorAll('.mechanics-phase-card').forEach((card) => {
+                const id = card.dataset.attachmentId;
+                if (!id || regenPendingDeleteIds.has(String(id))) return;
+                if (card.querySelector('.visual-file')?.files?.[0]) return;
+                if (card.dataset.cropDirty !== '1') return;
+                const crop = getCardCrop(card);
+                if (crop) crops[id] = crop;
+            });
+            return crops;
+        }
+
         async function saveExistingAttachmentOrder(assessmentId, ids) {
             if (!ids.length) return null;
             const response = await fetch(`${API_URL}/${assessmentId}/attachments/order`, {
@@ -2116,6 +2469,21 @@
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 throw new Error(data.error || `Could not save captions (${response.status})`);
+            }
+            return data;
+        }
+
+        async function saveAttachmentCrops(assessmentId, crops) {
+            const keys = Object.keys(crops || {});
+            if (!keys.length) return null;
+            const response = await fetch(`${API_URL}/${assessmentId}/attachments/crops`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ crops }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Could not save photo crops (${response.status})`);
             }
             return data;
         }
@@ -2439,7 +2807,6 @@
             }
         });
 
-        let regenPlayerTimer = null;
         async function runRegenPlayerLookup() {
             const assessments = await lookupRegenPlayerVisits(regenPlayerNameEl.value);
             if (!assessments.length) return;
@@ -2450,21 +2817,6 @@
                 await loadRegenAssessment(id);
             }
         }
-
-        regenPlayerNameEl.addEventListener('input', () => {
-            clearTimeout(regenPlayerTimer);
-            regenPlayerTimer = setTimeout(() => {
-                runRegenPlayerLookup().catch((err) => {
-                    regenLookupStatusEl.textContent = err.message;
-                });
-            }, 400);
-        });
-        regenPlayerNameEl.addEventListener('change', () => {
-            clearTimeout(regenPlayerTimer);
-            runRegenPlayerLookup().catch((err) => {
-                regenLookupStatusEl.textContent = err.message;
-            });
-        });
 
         loadAttachmentsBtn.addEventListener('click', async () => {
             loadAttachmentsBtn.disabled = true;
@@ -2531,6 +2883,7 @@
             const name = titleCaseName(rawName.trim());
             if (name.length < 2) {
                 resetTypePanel();
+                applyCreateCarryForward('', []);
                 refreshCreatePlayerBio();
                 return;
             }
@@ -2560,8 +2913,10 @@
 
                 if (assessments.length === 0) {
                     showInitial();
+                    applyCreateCarryForward(name, []);
                 } else {
                     showRetest(assessments);
+                    applyCreateCarryForward(name, assessments);
                 }
                 refreshCreatePlayerBio();
             } catch (err) {
@@ -2577,20 +2932,9 @@
             try {
                 const response = await fetch(`${API_URL}/recent?limit=100`);
                 if (!response.ok) return;
-                    const data = await response.json();
+                const data = await response.json();
                 const assessments = data.assessments || [];
-                    
-                    const playerDatalist = document.getElementById('playerNames');
-                playerDatalist.innerHTML = '';
-                [...new Set(assessments.map(a => a.player_name).filter(Boolean))]
-                    .sort((a, b) => a.localeCompare(b))
-                    .forEach(name => {
-                        const option = document.createElement('option');
-                        option.value = name;
-                        playerDatalist.appendChild(option);
-                    });
-
-                    const trainerDatalist = document.getElementById('trainerNames');
+                const trainerDatalist = document.getElementById('trainerNames');
                 trainerDatalist.innerHTML = '';
                 [...new Set(assessments.map(a => a.trainer_name).filter(Boolean))]
                     .sort((a, b) => a.localeCompare(b))
@@ -2606,16 +2950,204 @@
 
         loadRecentNames();
 
-        playerNameInput.addEventListener('blur', function () {
-            this.value = titleCaseName(this.value);
-            lookupPlayerPriors(this.value);
-        });
+        const trainingFocusEl = document.getElementById('trainingFocus');
+        const trainingFocusHintEl = document.getElementById('trainingFocusHint');
+        const TRAINING_FOCUS_HINT_DEFAULT =
+            'Page 1, right card. On a retest, the last visit’s Training Focus is filled in for you to edit.';
+        let createCarryKey = '';
 
-        playerNameInput.addEventListener('change', function () {
-            // datalist pick
-            this.value = titleCaseName(this.value);
-            lookupPlayerPriors(this.value);
-        });
+        function developmentNotesOnly(notesBySlot) {
+            const notes = notesBySlot && typeof notesBySlot === 'object' ? notesBySlot : {};
+            const out = {};
+            MECHANICS_PHASES.forEach((phase) => {
+                const entry = phaseNoteEntry(notes[phase.slot]);
+                if (entry.status === 'development') {
+                    out[phase.slot] = { status: 'development' };
+                }
+            });
+            return out;
+        }
+
+        function applyCarriedDevelopment(container, notesBySlot) {
+            const carried = developmentNotesOnly(notesBySlot);
+            container.querySelectorAll('.mechanics-phase-card').forEach((card) => {
+                const statusEl = card.querySelector('.mechanics-phase-status');
+                const notesEl = card.querySelector('.mechanics-phase-notes');
+                if (statusEl) {
+                    statusEl.value = carried[card.dataset.slot] ? 'development' : '';
+                }
+                if (notesEl) {
+                    notesEl.value = '';
+                    autosizeTextarea(notesEl);
+                }
+            });
+        }
+
+        function applyCreateCarryForward(playerName, assessments) {
+            const key = (playerName || '').trim().toLowerCase();
+            if (key && key === createCarryKey) return;
+            createCarryKey = key;
+            const latest = (assessments && assessments[0]) || null;
+            if (!key || !latest) {
+                trainingFocusEl.value = '';
+                trainingFocusHintEl.textContent = TRAINING_FOCUS_HINT_DEFAULT;
+                applyCarriedDevelopment(mechanicsRowsEl, {});
+                return;
+            }
+            const focus = (latest.training_focus || '').trim();
+            trainingFocusEl.value = focus;
+            applyCarriedDevelopment(mechanicsRowsEl, latest.mechanics_phase_notes || {});
+            const devCount = Object.keys(
+                developmentNotesOnly(latest.mechanics_phase_notes || {})
+            ).length;
+            if (focus || devCount) {
+                const bits = [];
+                if (focus) bits.push('Training Focus');
+                if (devCount) {
+                    bits.push(
+                        `${devCount} Development badge${devCount === 1 ? '' : 's'}`
+                    );
+                }
+                trainingFocusHintEl.textContent =
+                    `Carried from last visit (#${latest.assessment_id} · ${latest.assessment_date}): ${bits.join(' + ')}. Edit as needed.`;
+            } else {
+                trainingFocusHintEl.textContent = TRAINING_FOCUS_HINT_DEFAULT;
+            }
+        }
+
+        function bindPlayerRosterInput(input, listEl, { onCommit } = {}) {
+            let timer = null;
+            let items = [];
+            let active = -1;
+            let seq = 0;
+
+            function hideList() {
+                listEl.hidden = true;
+                listEl.innerHTML = '';
+                input.setAttribute('aria-expanded', 'false');
+                input.removeAttribute('aria-activedescendant');
+                active = -1;
+                items = [];
+            }
+
+            function render() {
+                listEl.innerHTML = '';
+                if (!items.length) {
+                    hideList();
+                    return;
+                }
+                items.forEach((p, i) => {
+                    const li = document.createElement('li');
+                    li.className = 'player-suggest-item';
+                    li.id = `${listEl.id}-opt-${i}`;
+                    li.setAttribute('role', 'option');
+                    li.setAttribute('aria-selected', i === active ? 'true' : 'false');
+                    const name = document.createElement('span');
+                    name.className = 'player-suggest-name';
+                    name.textContent = p.name;
+                    const meta = document.createElement('span');
+                    meta.className = 'player-suggest-meta';
+                    const bits = [p.source === 'directory' ? 'Roster' : 'Prior assessment'];
+                    if (p.player_id != null) bits.push(`ID ${p.player_id}`);
+                    meta.textContent = bits.join(' · ');
+                    li.append(name, meta);
+                    li.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        pick(p);
+                    });
+                    listEl.appendChild(li);
+                });
+                listEl.hidden = false;
+                input.setAttribute('aria-expanded', 'true');
+                if (active >= 0) {
+                    input.setAttribute(
+                        'aria-activedescendant',
+                        `${listEl.id}-opt-${active}`
+                    );
+                }
+            }
+
+            function pick(player) {
+                input.value = titleCaseName(player.name || '');
+                hideList();
+                if (onCommit) onCommit(input.value);
+            }
+
+            async function search(q) {
+                const token = ++seq;
+                const query = (q || '').trim();
+                if (!query) {
+                    hideList();
+                    return;
+                }
+                try {
+                    const response = await fetch(
+                        `${API_URL}/roster?q=${encodeURIComponent(query)}&limit=20`
+                    );
+                    const data = await response.json().catch(() => ({}));
+                    if (token !== seq) return;
+                    items = response.ok ? (data.players || []) : [];
+                    active = items.length ? 0 : -1;
+                    render();
+                } catch (err) {
+                    if (token !== seq) return;
+                    hideList();
+                }
+            }
+
+            input.addEventListener('input', () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => search(input.value), 120);
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown' && listEl.hidden && input.value.trim()) {
+                    e.preventDefault();
+                    search(input.value);
+                    return;
+                }
+                if (listEl.hidden) return;
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    active = Math.min(items.length - 1, active + 1);
+                    render();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    active = Math.max(0, active - 1);
+                    render();
+                } else if (e.key === 'Enter' && active >= 0 && items[active]) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pick(items[active]);
+                } else if (e.key === 'Escape') {
+                    hideList();
+                }
+            });
+            input.addEventListener('blur', () => {
+                window.setTimeout(hideList, 120);
+                const name = titleCaseName(input.value.trim());
+                input.value = name;
+                if (onCommit) onCommit(name);
+            });
+        }
+
+        bindPlayerRosterInput(
+            playerNameInput,
+            document.getElementById('playerSuggestList'),
+            { onCommit: (name) => lookupPlayerPriors(name) }
+        );
+        bindPlayerRosterInput(
+            regenPlayerNameEl,
+            document.getElementById('regenPlayerSuggestList'),
+            {
+                onCommit: (name) => {
+                    runRegenPlayerLookup().catch((err) => {
+                        regenLookupStatusEl.textContent = err.message;
+                    });
+                },
+            }
+        );
 
         let createBioTimer = null;
         playerNameInput.addEventListener('input', () => {
@@ -2856,6 +3388,7 @@
                 const visuals = collectAllVisualUploads(regenMechanicsRowsEl, regenVisualRowsEl);
                 const pendingDeletes = [...regenPendingDeleteIds];
                 const captionUpdates = collectExtraCaptionUpdates();
+                const cropUpdates = collectExistingCropUpdates();
                 const updates = {};
                 if (regenNotesDirty) {
                     updates.notes = regenNotesEl.value.trim();
@@ -2895,6 +3428,11 @@
                     await saveAttachmentCaptions(id, captionUpdates);
                     captionsSaved = true;
                 }
+                let cropsSaved = false;
+                if (Object.keys(cropUpdates).length) {
+                    await saveAttachmentCrops(id, cropUpdates);
+                    cropsSaved = true;
+                }
                 const remainingIds = collectRemainingAttachmentIds(uploadData?.uploaded || []);
                 if (remainingIds.length) {
                     await saveExistingAttachmentOrder(id, remainingIds);
@@ -2907,6 +3445,7 @@
                 if (uploadedCount) changes.push(`uploaded ${uploadedCount} image(s)`);
                 if (reordered) changes.push('updated photo order');
                 if (captionsSaved) changes.push('updated image captions');
+                if (cropsSaved) changes.push('updated photo crops');
                 if (regenNotesDirty) changes.push('updated notes');
                 if (regenVideoDirty) changes.push('updated video link');
                 if (regenMechSummaryDirty) changes.push('updated mechanical observation');
@@ -3079,7 +3618,7 @@
                 el.classList.add('is-idle');
                 note(
                     idleText ||
-                    'Enter a player name to preview height, weight, and age from the player directory (same values as the PDF header).'
+                    'Enter a player name to preview height, weight, and age from the player directory.'
                 );
                 return;
             }
@@ -3439,6 +3978,7 @@
             const tag = (e.target.tagName || '').toLowerCase();
             if (tag === 'textarea' || tag === 'button') return;
             if (e.target.closest('button')) return;
+            if (e.target.getAttribute('aria-expanded') === 'true') return;
             e.preventDefault();
             if (!createNextBtn.hidden) createNextBtn.click();
         });
@@ -3620,6 +4160,8 @@
                     );
                     form.reset();
                     createStep = 0;
+                    createCarryKey = '';
+                    trainingFocusHintEl.textContent = TRAINING_FOCUS_HINT_DEFAULT;
                     initMechanicsRows(mechanicsRowsEl);
                     visualRowsEl.innerHTML = '';
                     addVisualBtn.disabled = false;

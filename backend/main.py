@@ -560,6 +560,40 @@ def peek_player_directory_bio():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/hitting-assessment/roster", methods=["GET", "OPTIONS"])
+def search_hitting_assessment_roster():
+    """
+    Typeahead roster: player_directory first, then prior assessment names.
+
+    Query: q (or playerName) + optional limit (default 20, max 40).
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    query = (
+        request.args.get("q")
+        or request.args.get("playerName")
+        or request.args.get("player")
+        or ""
+    ).strip()
+    if len(query) < 1:
+        return jsonify({"query": query, "players": []}), 200
+    limit = request.args.get("limit", 20, type=int)
+    try:
+        import report_metrics
+
+        connection = get_db_connection()
+        try:
+            players = report_metrics.search_player_roster(
+                connection, query, limit=limit
+            )
+            return jsonify({"query": query, "players": players}), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("roster search failed for %s", query)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/hitting-assessment/<int:assessment_id>', methods=['GET'])
 def get_assessment(assessment_id):
     """Return one assessment by primary key."""
@@ -1006,6 +1040,49 @@ def update_assessment_attachment_captions(assessment_id):
 
 
 @app.route(
+    "/api/hitting-assessment/<int:assessment_id>/attachments/crops",
+    methods=["PUT", "OPTIONS"],
+)
+def update_assessment_attachment_crops(assessment_id):
+    """Body: { "crops": { "12": {"x":0.1,"y":0.2,"w":0.5,"h":0.6}, ... } }."""
+    if request.method == "OPTIONS":
+        return "", 204
+    try:
+        import attachments as attachments_mod
+
+        data = request.get_json(silent=True) or {}
+        raw = data.get("crops")
+        if not isinstance(raw, dict) or not raw:
+            return jsonify({"error": "crops must be a non-empty object"}), 400
+        crops = {}
+        try:
+            for key, value in raw.items():
+                crops[int(key)] = value
+        except (TypeError, ValueError):
+            return jsonify({"error": "crop keys must be attachment ids"}), 400
+
+        connection = get_db_connection()
+        try:
+            with connection.cursor(dictionary=True) as cursor:
+                row = fetch_assessment_by_id(cursor, assessment_id)
+                if not row:
+                    return jsonify({"error": "Assessment not found"}), 404
+            updated = attachments_mod.update_attachment_crops(
+                connection, assessment_id, crops
+            )
+            return jsonify({
+                "success": True,
+                "assessment_id": assessment_id,
+                "updated": updated,
+            }), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        logger.exception("Update crops failed for %s", assessment_id)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route(
     "/api/hitting-assessment/<int:assessment_id>/attachments/order",
     methods=["PUT", "OPTIONS"],
 )
@@ -1196,6 +1273,12 @@ def assessment_attachments(assessment_id):
                     or ""
                 )
                 slot = incoming_slots[i]
+                crop_raw = (
+                    request.form.get(f"crop{i}")
+                    or request.form.get(f"crops[{i}]")
+                    or request.form.get("crop")
+                    or ""
+                )
                 try:
                     uri, local_path = attachments_mod.store_image_bytes(
                         assessment_id=assessment_id,
@@ -1215,12 +1298,14 @@ def assessment_attachments(assessment_id):
                         local_path=local_path,
                         content_type=ct,
                         sort_order=sort_base + i,
+                        crop=crop_raw,
                     )
                     saved.append({
                         "attachment_id": aid,
                         "gcs_uri": uri,
                         "caption": caption or None,
                         "slot": slot,
+                        "crop": attachments_mod.parse_crop(crop_raw),
                     })
                 except Exception as e:
                     logger.exception("Attachment upload failed")

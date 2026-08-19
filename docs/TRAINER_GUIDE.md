@@ -24,8 +24,9 @@ Use **Change** at the top if you picked the wrong path. Your entries stay filled
 Choose **Submit a new assessment**, then step through the sections.
 
 ### 1. Athlete — player name
-- Type the player’s full name (autocomplete may suggest prior names).
+- Type the player’s name. A roster list narrows as you type (player directory first, then names from prior assessments). You can pick a match or keep typing a name that is not listed.
 - If they’ve been assessed before, the form shows prior visits so you can pick Initial vs Retest and which previous assessment to compare against.
+- A retest **carries Training Focus** and any open **Development** phase badges from the last visit; edit them before submit.
 - A peek under the name shows **athlete, assessment number** (Initial / 1st Retest / …), **height, weight, and age** — the same header fields as page 1 of the PDF. Age uses the assessment date below. If they are not in the directory, height / weight / age print as —.
 
 ### 2. Athlete — assessment date
@@ -58,9 +59,9 @@ Each swing phase gets its own card:
 5. Impact  
 
 Per phase you can add:
-- **Status** — Strength / Monitor / Development (green / amber / red badge on the PDF)
+- **Status** — Strength / Monitor / Development (green / amber / red badge on the PDF). On a retest, open **Development** badges from the last visit are pre-selected; Strength and Monitor are not carried.
 - **Caption** (coach cues for that stage — shown under the photo)
-- **One photo** per phase. PNG/JPEG/WebP, up to 4&nbsp;MB. The PDF shows each photo in the same portrait frame (center-cropped), so landscape or odd-sized uploads still line up.
+- **One photo** per phase. PNG/JPEG/WebP, up to 4&nbsp;MB. Photos fill a tall phone-like portrait frame on the PDF. After you add a photo, **drag** to reframe and use the **zoom** slider if the automatic crop cuts off the athlete. **Reset** restores the centered crop.
 
 Cards appear in a left-to-right sequence on PDF page 1 (Hitting Assessment).
 
@@ -68,11 +69,18 @@ Cards appear in a left-to-right sequence on PDF page 1 (Hitting Assessment).
 Screenshots and other context images. Use ↑ ↓ to set PDF order. Captions are recommended. Form checkboxes still say Blast / HitTrax / VALD so you can hide empty tool pages; those brand names are not printed on the PDF.
 
 ### 7. Notes (optional)
-- **Mechanical Observation** — left card under the swing sequence.
-- **Training Focus** — right card.
-- **Assessment Notes** — shorter strip under those two cards.
+These sit under the swing sequence. Empty boxes are omitted, and the remaining cards fill that space:
 
-Empty cards still print so the layout stays even. Use the formatting bar on each box (**B**, *I*, Heading, Body, List) instead of typing markdown. Ctrl/Cmd+B and Ctrl/Cmd+I also work.
+- **Mechanical Observation** — left card on the two-up layout.
+- **Training Focus** — right card. On a retest this is pre-filled from the last visit.
+- **Assessment Notes** — shorter strip under those two cards when all three are filled.
+
+Layout:
+- **One filled** — that card uses the full width and height of the notes area.
+- **Two filled** — both cards are full width and stacked.
+- **All three filled** — Mechanical Observation and Training Focus sit side by side, with Assessment Notes in a shorter strip below.
+
+Use the formatting bar on each box (**B**, *I*, Heading, Body, List) instead of typing markdown. Ctrl/Cmd+B and Ctrl/Cmd+I also work.
 
 - **Best of Day Summary** — one note for jump / hop / pull tests (later page).
 
@@ -94,7 +102,7 @@ Pick one mode:
 Enter the ID from the success message (e.g. `4`). After it loads, the form peeks the player directory for that athlete.
 
 **B) Player name + visit**  
-Enter the player, then choose Initial / 1st Retest / 2nd Retest / etc. from the dropdown. The directory peek shows athlete + assessment number as soon as the name matches, even before a visit is chosen.
+Type to search the roster, then choose Initial / 1st Retest / 2nd Retest / etc. from the dropdown. The directory peek shows athlete + assessment number as soon as the name matches, even before a visit is chosen.
 
 Once the assessment is identified, the form **automatically loads**:
 
@@ -110,6 +118,7 @@ No need to click Load first (there is still a **Reload saved images** button on 
 - Change notes, tools, or video link as needed. Session still shows a data peek so you can uncheck tools with no rows that day.
 - **Remove a photo:** use **Remove photo** on that phase card (or × on an extra image), then generate.
 - **Replace a photo:** choose a new file on that card; the old one is removed when you generate.
+- **Reframe a photo:** drag in the portrait well and use zoom; **Reset** restores the centered crop. Generate to apply it to the PDF.
 - **Captions:** edit them on the card / extra row (they grow with the text). Extra-image order uses ↑ ↓.
 
 ### Generate

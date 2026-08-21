@@ -19,7 +19,19 @@ The Cloud Build service account needs:
 - Artifact Registry Writer (or Editor) to push the image
 - Cloud Run Admin
 - Service Account User on the Cloud Run runtime SA
-- Secret Manager Secret Accessor for DB_* secrets
+- Secret Manager Secret Accessor for DB_* secrets and `ANTHROPIC_API_KEY`
+
+Create the Anthropic key secret before the next Cloud Build deploy (deploy fails if a `--set-secrets` name is missing):
+
+```bash
+gcloud secrets create ANTHROPIC_API_KEY --project=norse-coral-441421-r9
+# Real key, or a placeholder if drafts are not enabled yet:
+printf '%s' 'YOUR_ANTHROPIC_API_KEY' | gcloud secrets versions add ANTHROPIC_API_KEY --data-file=- --project=norse-coral-441421-r9
+```
+
+Grant the Cloud Run runtime service account Secret Accessor on that secret if it is not already using a project-wide accessor role. Optional: set `HEAT_DRAFT_MODEL` on Cloud Run (default `claude-sonnet-4-6`) without a code change.
+
+Without a real key, Draft buttons still show on the form; the API returns 503.
 
 
 
@@ -51,7 +63,7 @@ gcloud projects add-iam-policy-binding norse-coral-441421-r9 \
 # Per-phase mechanics notes (JSON) for PDF phase cards
 # deployment/hitting_assessments_mechanics_phase_notes.sql
 
-# Mechanical Summary + Best of Day Summary text boxes on the PDF
+# Mechanical Observation + Force-Plate Metrics Summary text boxes on the PDF
 # deployment/hitting_assessments_pdf_summaries.sql
 
 # Training Focus card on PDF page 1
@@ -76,7 +88,7 @@ SHOW COLUMNS FROM hitting_assessments LIKE 'training_focus';
 
 **Status (2026-08-13):** run `hitting_assessments_mechanics_phase_notes.sql` before using phase-card notes (create/regen will fail SELECT/INSERT until the column exists).
 
-**Status (2026-08-14):** run `hitting_assessments_pdf_summaries.sql` before Mechanical Observation / Best of Day Summary persist. Run `hitting_assessments_training_focus.sql` before Training Focus persists. Run `player_directory_height_weight.sql` after probing `SHOW COLUMNS FROM player_directory` (skip if height/weight already exist).
+**Status (2026-08-14):** run `hitting_assessments_pdf_summaries.sql` before Mechanical Observation / Force-Plate Metrics Summary persist. Run `hitting_assessments_training_focus.sql` before Training Focus persists. Run `player_directory_height_weight.sql` after probing `SHOW COLUMNS FROM player_directory` (skip if height/weight already exist).
 ## GCS bucket `heat-assessment-reports`
 
 - Keep **private** (signed URLs from the API).

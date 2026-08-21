@@ -594,6 +594,39 @@ def search_hitting_assessment_roster():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/hitting-assessment/draft-summaries", methods=["POST", "OPTIONS"])
+def draft_hitting_assessment_summaries():
+    """Fill one Notes-step textarea from Anthropic using form + session context."""
+    if request.method == "OPTIONS":
+        return "", 204
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    notes_ok, phase_notes, notes_err = _normalize_mechanics_phase_notes(
+        data.get("mechanicsPhaseNotes") or data.get("mechanics_phase_notes")
+    )
+    if not notes_ok:
+        return jsonify({"error": notes_err}), 400
+    payload = dict(data)
+    payload["mechanicsPhaseNotes"] = phase_notes
+    try:
+        import report_drafts
+
+        connection = get_db_connection()
+        try:
+            result = report_drafts.draft_summary(connection, payload)
+            return jsonify(result), 200
+        finally:
+            connection.close()
+    except Exception as e:
+        import report_drafts as _drafts
+
+        if isinstance(e, _drafts.DraftError):
+            return jsonify({"error": str(e)}), e.status
+        logger.exception("draft-summaries failed")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/hitting-assessment/<int:assessment_id>', methods=['GET'])
 def get_assessment(assessment_id):
     """Return one assessment by primary key."""

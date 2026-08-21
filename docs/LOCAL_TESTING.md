@@ -74,6 +74,9 @@ $env:DB_PASS = (& $gcloud secrets versions access latest --secret=DB_PASS --proj
 $env:HEAT_GCS_BUCKET = "heat-assessment-reports"
 $env:HEAT_GCS_PREFIX = "heat-assessments/"
 $env:REPORT_LOCAL_DIR = "reports"
+# Optional: AI note drafts (Mechanical Observation / Training Focus / Force-Plate Metrics)
+$env:ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY"
+# $env:HEAT_DRAFT_MODEL = "claude-sonnet-4-6"
 
 cd backend
 ..\.venv\Scripts\python.exe main.py
@@ -89,7 +92,9 @@ Invoke-RestMethod http://localhost:8080/health
 
 Expect something like `status=healthy` and `database=connected`.
 
-`debug=False`, so **restart Flask** after Python changes (`report_pdf.py`, `report_wellness.py`, etc.) or form-generated PDFs will still be the old layout.
+`debug=False`, so **restart Flask** after Python changes (`report_pdf.py`, `report_drafts.py`, `report_wellness.py`, etc.) or form-generated PDFs will still be the old layout.
+
+Draft buttons work without a key for everything else; `POST /api/hitting-assessment/draft-summaries` returns 503 until `ANTHROPIC_API_KEY` is set.
 
 ---
 
@@ -100,19 +105,21 @@ Expect something like `status=healthy` and `database=connected`.
 Use this while iterating on page layout. Needs the **Cloud SQL proxy** (section 2). Flask is optional.
 
 1. In Cursor, open `notebooks/pdf_page_preview.ipynb`.
-2. Kernel: repo `.venv`  
-   (`C:\Users\skgoa\OneDrive\Documents\Code\HEAT-Assessment-Dates\.venv\Scripts\python.exe`).
+2. Kernel: repo `.venv`
+  (`C:\Users\skgoa\OneDrive\Documents\Code\HEAT-Assessment-Dates\.venv\Scripts\python.exe`).
 3. Run **Setup**, then **Load assessment**, then **Preview**.
 4. Set `PAGE` in the Preview cell (`"wellness"`, `"mechanics"`, `"all"`, …) and re-run that cell after PDF code changes.
 
 Jason Peele IDs in PlayerDev:
 
-| ID | Date | Type | Wellness window |
-|----|------|------|-----------------|
-| 1 | 2025-11-23 | Initial | through Nov 23 (no WQ rows) |
-| 2 | 2026-01-12 | 1st retest | Nov 23–Jan 12 (WQ starts Feb 8 → empty) |
-| **3** | **2026-03-08** | **2nd retest** | **Jan 12–Mar 8 (use this)** |
-| 4 | 2026-05-03 | 3rd retest | Mar 8–May 3 |
+
+| ID    | Date           | Type           | Wellness window                         |
+| ----- | -------------- | -------------- | --------------------------------------- |
+| 1     | 2025-11-23     | Initial        | through Nov 23 (no WQ rows)             |
+| 2     | 2026-01-12     | 1st retest     | Nov 23–Jan 12 (WQ starts Feb 8 → empty) |
+| **3** | **2026-03-08** | **2nd retest** | **Jan 12–Mar 8 (use this)**             |
+| 4     | 2026-05-03     | 3rd retest     | Mar 8–May 3                             |
+
 
 PNGs/PDFs land in `backend/reports/_preview/` (`page_wellness.pdf`, `page_mechanics.pdf`, …).
 

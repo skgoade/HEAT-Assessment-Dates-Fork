@@ -63,6 +63,8 @@ Per phase you can add:
 - **Caption** (coach cues for that stage — shown under the photo)
 - **One photo** per phase. PNG/JPEG/WebP, up to 4&nbsp;MB. Photos fill a tall phone-like portrait frame on the PDF. After you add a photo, **drag** to reframe and use the **zoom** slider if the automatic crop cuts off the athlete. **Reset** restores the centered crop.
 
+**Clip from a swing video (optional):** Load an MP4/WebM on this same step (it stays on your device and is **not** uploaded). Pause, use **−1 / +1 frame**, choose the phase, optionally set status and caption, then **Capture this frame**. That still goes into the phase card so you can pan/zoom as usual. The Video Analysis Link on the Session step is separate (a URL printed on the PDF).
+
 Cards appear in a left-to-right sequence on PDF page 1 (Hitting Assessment).
 
 ### 6. Extra images (optional)
@@ -82,7 +84,9 @@ Layout:
 
 Use the formatting bar on each box (**B**, *I*, Heading, Body, List) instead of typing markdown. Ctrl/Cmd+B and Ctrl/Cmd+I also work.
 
-- **Best of Day Summary** — one note for jump / hop / pull tests (later page).
+Optional **Draft** buttons can fill Mechanical Observation, Training Focus, and Force-Plate Metrics from the notes and session data already on the form. Always edit the draft before you submit. Photos and swing video are not sent. Assessment Notes stay trainer-typed (no Draft button). Training Focus drafts are better after Mechanical Observation is filled if you want that in the pack. Force-Plate Metrics needs force-plate tests for that player and date; the draft also pulls a compact history of earlier force-plate sessions for the same athlete name from the last ~12 months (including weekly tests between formal HEAT visits) so it can reflect progress without a large AI payload.
+
+- **Force-Plate Metrics Summary** — one note for jump / hop / pull tests (later page).
 
 ### 8. Submit
 - On the last section, click **Submit Assessment**.
@@ -117,7 +121,7 @@ No need to click Load first (there is still a **Reload saved images** button on 
 ### Edit before generating
 - Change notes, tools, or video link as needed. Session still shows a data peek so you can uncheck tools with no rows that day.
 - **Remove a photo:** use **Remove photo** on that phase card (or × on an extra image), then generate.
-- **Replace a photo:** choose a new file on that card; the old one is removed when you generate.
+- **Replace a photo:** choose a new file on that card, or capture a new frame from a swing video; the old one is removed when you generate.
 - **Reframe a photo:** drag in the portrait well and use zoom; **Reset** restores the centered crop. Generate to apply it to the PDF.
 - **Captions:** edit them on the card / extra row (they grow with the text). Extra-image order uses ↑ ↓.
 
@@ -138,7 +142,7 @@ If player + visit lookup finds nothing, use **Change** and start a **new** asses
 | Batted ball by location | Location table, then EV/LA zone heatmaps side by side |
 | Contact location | Plate (vertical + depth) and a smaller POI zone chart |
 | Flight & spray | Spray (labeled distance arcs) + EV×LA (dual y) |
-| Best of Day Metrics | Jump / hop / pull KPI cards + one optional summary; trend cards sit with that block |
+| Force-Plate Metrics | Jump / hop / pull KPI cards + one optional summary; trend cards sit with that block |
 | Extra images | Your uploads + captions |
 | Wellness & Readiness (**retests only**, last page) | Self-reported check-ins for that training block |
 

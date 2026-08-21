@@ -49,7 +49,7 @@ LOGO_COL_WIDTH = 1.9 * inch
 PAGE_CONTENT_WIDTH = 7.1 * inch
 TITLE_COL_WIDTH = PAGE_CONTENT_WIDTH - LOGO_COL_WIDTH
 
-# Best of Day: KPI cards by test (no source-brand names). Hop L/R peak force
+# Force-Plate Metrics (VALD): KPI cards by test. Hop L/R peak force
 # omitted until those columns exist on VALD_FD_HJ.
 VALD_TEST_SECTIONS: list[dict[str, Any]] = [
     {
@@ -111,6 +111,17 @@ def _fmt(val: Any) -> str:
     if isinstance(val, float):
         return f"{val:.1f}"
     return str(val)
+
+
+def _fmt_with_unit(val: Any, unit: str) -> str:
+    """Value cell with unit; degrees sit on the number, others after a space."""
+    shown = _fmt(val)
+    unit = (unit or "").strip()
+    if shown == "—" or not unit:
+        return shown
+    if unit in {"°", "º"}:
+        return f"{shown}{unit}"
+    return f"{shown} {unit}"
 
 
 def _kpi_value_and_unit(value: Any, unit: str) -> tuple[str, str]:
@@ -364,11 +375,11 @@ def _blast_side_by_side_table(
     bat_keys = list(BLAST_BAT_ORDER)
     cols_per_bat = 1 + (1 if has_previous else 0) + (1 if has_baseline else 0)
     metric_defs = [
-        ("Peak Bat Speed (mph)", "peak_bat_speed", True),
-        ("Average Bat Speed (mph)", "avg_bat_speed", True),
-        ("SD Bat Speed (mph)", "sd_bat_speed", False),
-        ("Average Attack Angle (°)", "avg_attack_angle", False),
-        ("SD Attack Angle (°)", "sd_attack_angle", False),
+        ("Peak Bat Speed", "peak_bat_speed", True, "mph"),
+        ("Average Bat Speed", "avg_bat_speed", True, "mph"),
+        ("SD Bat Speed", "sd_bat_speed", False, "mph"),
+        ("Average Attack Angle", "avg_attack_angle", False, "°"),
+        ("SD Attack Angle", "sd_attack_angle", False, "°"),
     ]
 
     header_style = ParagraphStyle(
@@ -424,14 +435,14 @@ def _blast_side_by_side_table(
     # Track delta cells that need green/red fills: (row_idx, col_idx, sign)
     colored_deltas: list[tuple[int, int, int]] = []
 
-    for label, field, colorize in metric_defs:
+    for label, field, colorize, unit in metric_defs:
         row: list[Any] = [Paragraph(f"{escape(label)}:", metric_style)]
         for key in bat_keys:
             curr_g = blast_group_stats(current_blast, key)
             prev_g = blast_group_stats(previous_blast, key) if has_previous else {}
             base_g = blast_group_stats(baseline_blast, key) if has_baseline else {}
             curr = curr_g.get(field)
-            row.append(Paragraph(_fmt(curr), data_style))
+            row.append(Paragraph(_fmt_with_unit(curr, unit), data_style))
             if has_previous:
                 prev_v = prev_g.get(field)
                 text, _color = _delta_values(curr, prev_v)
@@ -508,14 +519,14 @@ def _hittrax_profile_table(
 ) -> Table:
     """Metric / Current / Previous (or Initial) / Change, plus Initial on later retests."""
     rows_def = [
-        ("Peak EV (mph)", "peak_ev"),
-        ("Avg EV (mph)", "avg_ev"),
-        ("90th EV (mph)", "p90_ev"),
-        ("Avg Launch Angle (°)", "avg_launch_angle"),
-        ("Avg LA (Hard Hit) (°)", "avg_la_hard_hit"),
-        ("Avg EV (LA 5–15°) (mph)", "avg_ev_ideal_la"),
-        ("Avg Distance (ft)", "avg_distance"),
-        ("Contacts", "swing_count"),
+        ("Peak EV", "peak_ev", "mph"),
+        ("Avg EV", "avg_ev", "mph"),
+        ("90th EV", "p90_ev", "mph"),
+        ("Avg Launch Angle", "avg_launch_angle", "°"),
+        ("Avg LA (Hard Hit)", "avg_la_hard_hit", "°"),
+        ("Avg EV (LA 5–15°)", "avg_ev_ideal_la", "mph"),
+        ("Avg Distance", "avg_distance", "ft"),
+        ("Contacts", "swing_count", ""),
     ]
     header_style = ParagraphStyle(
         "HtProfileHeader",
@@ -562,16 +573,16 @@ def _hittrax_profile_table(
     data: list[list[Any]] = [header]
     la_neutral = {"avg_launch_angle", "avg_la_hard_hit"}
     base_ht = baseline_ht or {}
-    for label, field in rows_def:
+    for label, field, unit in rows_def:
         curr = current_ht.get(field)
         prev = previous_ht.get(field) if has_previous else None
         base = base_ht.get(field) if show_base else None
         row: list[Any] = [
             Paragraph(escape(label), metric_style),
-            Paragraph(_fmt(curr), data_style),
+            Paragraph(_fmt_with_unit(curr, unit), data_style),
         ]
         if has_previous:
-            row.append(Paragraph(_fmt(prev), data_style))
+            row.append(Paragraph(_fmt_with_unit(prev, unit), data_style))
             row.append(
                 Paragraph(
                     _kpi_delta_markup(curr, prev, neutral=field in la_neutral)
@@ -580,7 +591,7 @@ def _hittrax_profile_table(
                 )
             )
         if show_base:
-            row.append(Paragraph(_fmt(base), data_style))
+            row.append(Paragraph(_fmt_with_unit(base, unit), data_style))
             row.append(
                 Paragraph(
                     _kpi_delta_markup(curr, base, neutral=field in la_neutral)
@@ -639,9 +650,9 @@ def _hittrax_location_breakdown_table(
         return []
 
     metric_keys = (
-        ("avg_ev", "Average Exit Velocity (mph)"),
-        ("avg_launch_angle", "Average Launch Angle (°)"),
-        ("avg_distance", "Average Distance (ft)"),
+        ("avg_ev", "Average Exit Velocity", "mph"),
+        ("avg_launch_angle", "Average Launch Angle", "°"),
+        ("avg_distance", "Average Distance", "ft"),
     )
     cols_per_metric = 1 + (1 if has_previous else 0) + (1 if has_baseline else 0)
 
@@ -690,7 +701,7 @@ def _hittrax_location_breakdown_table(
     date_label = _short_date(current_date)
     top: list[Any] = ["", ""]
     sub: list[Any] = ["", ""]
-    for _key, title in metric_keys:
+    for _key, title, _unit in metric_keys:
         top.append(Paragraph(escape(title), header_style))
         top.extend([""] * (cols_per_metric - 1))
         sub.append(Paragraph(escape(date_label), sub_header_style))
@@ -720,11 +731,11 @@ def _hittrax_location_breakdown_table(
                 section_cell,
                 Paragraph(f"{escape(row_label)}:", row_style),
             ]
-            for metric_field, _title in metric_keys:
+            for metric_field, _title, unit in metric_keys:
                 curr = hittrax_breakdown_value(
                     current_breakdown, section_key, row_key, metric_field
                 )
-                row.append(Paragraph(_fmt(curr), data_style))
+                row.append(Paragraph(_fmt_with_unit(curr, unit), data_style))
                 if has_previous:
                     prev_v = hittrax_breakdown_value(
                         previous_breakdown, section_key, row_key, metric_field
@@ -781,7 +792,7 @@ def _hittrax_location_breakdown_table(
         ("SPAN", (0, 1), (1, 1)),
         ("BACKGROUND", (0, 2), (0, -1), colors.HexColor("#eef3f8")),
     ]
-    for i, (_k, _t) in enumerate(metric_keys):
+    for i, _metric in enumerate(metric_keys):
         start = 2 + i * cols_per_metric
         end = start + cols_per_metric - 1
         if cols_per_metric > 1:
@@ -830,7 +841,7 @@ def _comparison_table(
     When ``definitions`` maps metric label → description, each Metric cell
     shows the name plus a muted definition underneath (fills table width;
     avoids a separate definitions block). ``units`` maps label → unit shown
-    next to the metric name.
+    in the Current value cell.
     """
     flow: list = [Paragraph(title, section_style)]
     headers = ["Metric", "Current"]
@@ -856,8 +867,6 @@ def _comparison_table(
         desc = (definitions or {}).get(label, "").strip() if definitions else ""
         unit = (units or {}).get(label, "").strip() if units else ""
         name_html = escape(label)
-        if unit:
-            name_html = f"{name_html} ({escape(unit)})"
         if desc and def_style is not None:
             # Plain list stacks name + definition in the cell. KeepTogether inside
             # a Table cell reports an effectively infinite height (LayoutError).
@@ -865,11 +874,9 @@ def _comparison_table(
                 Paragraph(f"<b>{name_html}</b>", cell_style),
                 Paragraph(escape(desc), def_style),
             ]
-        elif unit:
-            metric_cell = Paragraph(name_html, cell_style)
         else:
             metric_cell = label
-        row: list[Any] = [metric_cell, _fmt(curr)]
+        row: list[Any] = [metric_cell, _fmt_with_unit(curr, unit)]
         if has_previous:
             row.append(_delta_para(curr, prev_v, cell_style))
         if has_baseline:
@@ -1959,16 +1966,16 @@ def _kpi_group_box(
     has_baseline: bool = False,
     previous_label: str = "Previous",
 ) -> list:
-    """Section frame with title inside — matches the Best of Day mockup groups."""
+    """Section frame with title inside — matches the Force-Plate Metrics mockup groups."""
     title_style = ParagraphStyle(
         "KpiGroupTitle",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
         fontSize=7,
         leading=9,
-        textColor=NAVY,
+        textColor=colors.white,
         alignment=1,
-        spaceAfter=2,
+        spaceAfter=0,
     )
     inner_w = PAGE_CONTENT_WIDTH - 16
     grid_bits = _kpi_mixed_grid(
@@ -1999,22 +2006,23 @@ def _kpi_group_box(
     inner.setStyle(
         TableStyle(
             [
-                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d7de")),
-                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("BOX", (0, 0), (-1, -1), 1.0, NAVY),
+                ("BACKGROUND", (0, 0), (0, 0), NAVY),
+                ("BACKGROUND", (0, 1), (0, 1), colors.white),
                 ("LEFTPADDING", (0, 0), (0, 0), 8),
                 ("RIGHTPADDING", (0, 0), (0, 0), 8),
-                ("TOPPADDING", (0, 0), (0, 0), 4),
-                ("BOTTOMPADDING", (0, 0), (0, 0), 1),
+                ("TOPPADDING", (0, 0), (0, 0), 5),
+                ("BOTTOMPADDING", (0, 0), (0, 0), 4),
                 ("LEFTPADDING", (0, 1), (0, 1), 4),
                 ("RIGHTPADDING", (0, 1), (0, 1), 4),
-                ("TOPPADDING", (0, 1), (0, 1), 1),
+                ("TOPPADDING", (0, 1), (0, 1), 4),
                 ("BOTTOMPADDING", (0, 1), (0, 1), 4),
                 ("ALIGN", (0, 0), (0, 0), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]
         )
     )
-    return [inner, Spacer(1, 4)]
+    return [inner, Spacer(1, 6)]
 
 
 def _section_heading(title: str, title_style: ParagraphStyle) -> Paragraph:
@@ -2146,14 +2154,15 @@ class _NotesCardBox(Flowable):
 
     def wrap(self, availWidth, availHeight):
         pad = 10
-        title_h = 16
+        title_h = 16 if (self.title or "").strip() else 0
+        title_gap = 8 if title_h else 0
         body_w = self.box_width - 2 * pad
         body_h = 0
         for f in self.body_flowables:
             _w, fh = f.wrap(body_w, 40 * inch)
             body_h += fh + 2
         self.width = self.box_width
-        content_h = max(self.min_height, pad + title_h + 8 + body_h + pad)
+        content_h = max(self.min_height, pad + title_h + title_gap + body_h + pad)
         self.height = max(content_h, self._forced_height)
         return self.width, self.height
 
@@ -2165,30 +2174,34 @@ class _NotesCardBox(Flowable):
         c = self.canv
         w, h = self.box_width, self.height
         pad = 10
-        title_h = 16
+        has_title = bool((self.title or "").strip())
+        title_h = 16 if has_title else 0
         c.setFillColor(colors.HexColor("#f3f4f6"))
         c.setStrokeColor(colors.HexColor("#e5e7eb"))
         c.setLineWidth(0.4)
         c.roundRect(0, 0, w, h, 5, fill=1, stroke=1)
 
-        title_y = h - pad - 8
-        text_x = pad
-        if self.icon:
-            r = 5
-            cx = pad + r
-            cy = title_y + 2
-            c.setStrokeColor(NAVY)
+        if has_title:
+            title_y = h - pad - 8
+            text_x = pad
+            if self.icon:
+                r = 5
+                cx = pad + r
+                cy = title_y + 2
+                c.setStrokeColor(NAVY)
+                c.setFillColor(NAVY)
+                c.setLineWidth(0.9)
+                c.circle(cx, cy, r, stroke=1, fill=0)
+                c.circle(cx, cy, r * 0.52, stroke=1, fill=0)
+                c.circle(cx, cy, 1.15, stroke=0, fill=1)
+                text_x = pad + 2 * r + 6
             c.setFillColor(NAVY)
-            c.setLineWidth(0.9)
-            c.circle(cx, cy, r, stroke=1, fill=0)
-            c.circle(cx, cy, r * 0.52, stroke=1, fill=0)
-            c.circle(cx, cy, 1.15, stroke=0, fill=1)
-            text_x = pad + 2 * r + 6
-        c.setFillColor(NAVY)
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(text_x, title_y, self.title)
+            c.setFont("Helvetica-Bold", 8)
+            c.drawString(text_x, title_y, self.title)
+            y = h - pad - title_h - 8
+        else:
+            y = h - pad
 
-        y = h - pad - title_h - 8
         body_w = w - 2 * pad
         for f in self.body_flowables:
             _w, fh = f.wrap(body_w, 40 * inch)
@@ -2611,7 +2624,7 @@ def _wellness_block_cards(block: dict[str, Any], styles) -> Table:
     bw_first, bw_last = block.get("bw_first"), block.get("bw_last")
     bw_change = block.get("bw_change")
     if bw_first is not None and bw_last is not None:
-        bw_text = f"{bw_first:.0f} → {bw_last:.0f}"
+        bw_text = f"{bw_first:.0f} → {bw_last:.0f} lb"
         ch = f"Change: {bw_change:+.0f} lb" if bw_change is not None else "Change"
     else:
         bw_text = "—"
@@ -2670,7 +2683,7 @@ def _wellness_daily_table(block: dict[str, Any], styles) -> Table:
         "STRESS",
         "DIET",
         "ARM READY",
-        "WEIGHT (LB)",
+        "WEIGHT",
         "WELLNESS SCORE",
     ]
     data = [[Paragraph(h, head) for h in headers]]
@@ -2682,7 +2695,7 @@ def _wellness_daily_table(block: dict[str, Any], styles) -> Table:
         day = r.get("date")
         date_s = day.strftime("%b %d") if hasattr(day, "strftime") else "—"
         wt = r.get("weight")
-        wt_s = f"{wt:.0f}" if wt is not None else "—"
+        wt_s = f"{wt:.0f} lb" if wt is not None else "—"
         well = r.get("wellness")
         data.append(
             [
@@ -2728,6 +2741,50 @@ def _wellness_daily_table(block: dict[str, Any], styles) -> Table:
             cmds.append(("BACKGROUND", (0, i), (7, i), colors.HexColor("#f8fafc")))
     table.setStyle(TableStyle(cmds))
     return table
+
+
+def _wellness_donut_legend(styles) -> Table:
+    """Color-coding for the wellness distribution donut (Excellent → Very Poor)."""
+    lab = ParagraphStyle(
+        "WqDonutLeg",
+        parent=styles["Normal"],
+        fontSize=6.5,
+        leading=8,
+        textColor=NAVY,
+        alignment=0,
+    )
+    rows: list = []
+    for name in report_wellness.SCORE_BAND_ORDER:
+        hex_c = report_wellness.SCORE_SCALE_HEX[name]
+        swatch = Table([[""]], colWidths=[8], rowHeights=[8])
+        swatch.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(hex_c)),
+                    ("BOX", (0, 0), (-1, -1), 0.3, colors.HexColor("#d0d7de")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        rows.append([swatch, Paragraph(escape(name), lab)])
+    legend = Table(rows, colWidths=[12, 1.05 * inch])
+    legend.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (0, -1), 0),
+                ("RIGHTPADDING", (0, 0), (0, -1), 4),
+                ("LEFTPADDING", (1, 0), (1, -1), 0),
+                ("RIGHTPADDING", (1, 0), (1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
+    return legend
 
 
 def _wellness_page_flow(
@@ -2819,12 +2876,28 @@ def _wellness_page_flow(
         )
     right_bits: list = [Paragraph("WELLNESS DISTRIBUTION", h_style)]
     if donut_png:
-        dimg = Image(BytesIO(donut_png), width=1.55 * inch, height=1.55 * inch)
+        dimg = Image(BytesIO(donut_png), width=1.45 * inch, height=1.45 * inch)
         dimg.hAlign = "CENTER"
-        right_bits.append(dimg)
+        donut_row = Table(
+            [[dimg, _wellness_donut_legend(styles)]],
+            colWidths=[1.55 * inch, 1.2 * inch],
+        )
+        donut_row.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("ALIGN", (0, 0), (0, 0), "CENTER"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        right_bits.append(donut_row)
     pair = Table(
         [[left_bits, right_bits]],
-        colWidths=[4.7 * inch, 2.4 * inch],
+        colWidths=[4.35 * inch, 2.75 * inch],
     )
     pair.setStyle(
         TableStyle(
@@ -3211,7 +3284,7 @@ def _collect_story_pages(
                 title="Hitting Assessment",
                 subtitle=(
                     "Swing mechanics, batted-ball results, contact location, "
-                    "and Best of Day force metrics from this session."
+                    "and Force-Plate Metrics from this session."
                 ),
                 after_space=12,
             )
@@ -3633,9 +3706,9 @@ def _collect_story_pages(
                 kpi_blocks.append((spec["title"], cards))
         bod_summary = bundle.get("best_of_day_summary") or ""
 
-        def _bod_chrome():
+        def _bod_chrome(title: str = "Force-Plate Metrics"):
             return _section_chrome(
-                "Best of Day Metrics",
+                title,
                 section,
                 subtitle=(
                     "Session isometric-pull, hop, countermovement-jump, and squat-jump "
@@ -3658,7 +3731,15 @@ def _collect_story_pages(
                 )
             )
         summary_card = _notes_card(
-            "BEST OF DAY METRICS OVERALL SUMMARY",
+            "OVERALL SUMMARY",
+            bod_summary,
+            styles,
+            width=PAGE_CONTENT_WIDTH,
+            height=0.75 * inch,
+            heading_as_title=True,
+        )
+        overflow_summary = _notes_card(
+            "",
             bod_summary,
             styles,
             width=PAGE_CONTENT_WIDTH,
@@ -3692,7 +3773,13 @@ def _collect_story_pages(
                         KeepInFrame(
                             PAGE_CONTENT_WIDTH,
                             usable_h,
-                            [_bod_chrome(), Spacer(1, 4), summary_card],
+                            [
+                                _bod_chrome(
+                                    "Force-Plate Metrics — Overall Summary"
+                                ),
+                                Spacer(1, 4),
+                                overflow_summary,
+                            ],
                             mode="shrink",
                             hAlign="LEFT",
                             vAlign="TOP",

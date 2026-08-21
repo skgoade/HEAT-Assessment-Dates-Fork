@@ -130,6 +130,50 @@
             margin-top: 6px;
         }
 
+        .notes-field-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .notes-field-head label {
+            margin-bottom: 0;
+        }
+
+        .draft-btn {
+            width: auto;
+            flex-shrink: 0;
+            margin-top: 0;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 700;
+            background: transparent;
+            color: #fcba39;
+            border: 2px solid rgba(252, 186, 57, 0.5);
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .draft-btn:hover:not(:disabled) {
+            background: rgba(252, 186, 57, 0.12);
+        }
+
+        .draft-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .draft-status.is-error {
+            color: #ff8a8a;
+        }
+
+        .draft-status.is-ok {
+            color: #9ae6b4;
+        }
+
         .notes-editor {
             display: flex;
             flex-direction: column;
@@ -399,6 +443,85 @@
             margin: 0;
             padding: 0;
             accent-color: #fcba39;
+        }
+
+        .swing-clipper {
+            margin: 0 0 18px;
+            padding: 14px;
+            border: 1px solid rgba(252, 186, 57, 0.28);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.22);
+        }
+
+        .swing-clipper-video-wrap {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .swing-clipper.is-ready .swing-clipper-video-wrap {
+            display: block;
+        }
+
+        .swing-clipper video {
+            width: 100%;
+            max-height: 320px;
+            background: #0f1720;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .swing-clipper-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .swing-clipper-btn {
+            width: auto;
+            margin: 0;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        .swing-clipper-time {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.65);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .swing-clipper-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .swing-clipper-grid .form-span {
+            grid-column: 1 / -1;
+        }
+
+        .swing-clipper-caption {
+            min-height: 64px;
+        }
+
+        .swing-clipper-status {
+            font-size: 13px;
+            min-height: 1.2em;
+            margin-top: 8px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .mechanics-phase-card.is-clip-target {
+            outline: 2px solid rgba(252, 186, 57, 0.85);
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 640px) {
+            .swing-clipper-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .mechanics-remove-photo,
@@ -1247,11 +1370,12 @@
                     <p class="section-intro" style="margin: 0 0 12px;">
                         One card per swing phase (Load Phase → Impact). Choose Strength /
                         Monitor / Development, add a caption, and attach <strong>one photo</strong>
-                        per phase. On a retest, open <strong>Development</strong> badges from the
-                        last visit are pre-selected. PNG/JPEG/WebP, up to 4&nbsp;MB each. Photos fill a
-                        tall phone-like portrait frame on the PDF. Drag to reframe and use the
-                        zoom slider if the automatic crop cuts off the athlete.
+                        per phase. You can upload a still, or load a swing video below and
+                        capture frames into a phase. On a retest, open <strong>Development</strong>
+                        badges from the last visit are pre-selected. PNG/JPEG/WebP, up to
+                        4&nbsp;MB each. Photos fill a tall phone-like portrait frame on the PDF.
                     </p>
+                    <div id="createSwingClipper"></div>
                     <div id="mechanicsRows"></div>
                 </div>
             </div>
@@ -1276,7 +1400,12 @@
             <div class="wizard-step" data-step="4" hidden>
                 <h2 class="wizard-step-title">Notes</h2>
                 <div class="form-group">
-                    <label for="mechanicalSummary">Mechanical Observation</label>
+                    <div class="notes-field-head">
+                        <label for="mechanicalSummary">Mechanical Observation</label>
+                        <button type="button" class="draft-btn" id="draftMechanicalBtn" disabled>
+                            Draft
+                        </button>
+                    </div>
                     <textarea
                         id="mechanicalSummary"
                         name="mechanicalSummary"
@@ -1286,10 +1415,16 @@
                     <div class="helper-text">
                         Page 1, left card.
                     </div>
+                    <div class="helper-text draft-status" id="draftMechanicalStatus"></div>
                 </div>
 
                 <div class="form-group">
-                    <label for="trainingFocus">Training Focus</label>
+                    <div class="notes-field-head">
+                        <label for="trainingFocus">Training Focus</label>
+                        <button type="button" class="draft-btn" id="draftTrainingFocusBtn" disabled>
+                            Draft
+                        </button>
+                    </div>
                     <textarea
                         id="trainingFocus"
                         name="trainingFocus"
@@ -1299,6 +1434,7 @@
                     <div class="helper-text" id="trainingFocusHint">
                         Page 1, right card. On a retest, the last visit’s Training Focus is filled in for you to edit.
                     </div>
+                    <div class="helper-text draft-status" id="draftTrainingFocusStatus"></div>
                 </div>
 
                 <div class="form-group">
@@ -1314,7 +1450,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="bestOfDaySummary">Best of Day Summary</label>
+                    <div class="notes-field-head">
+                        <label for="bestOfDaySummary">Force-Plate Metrics Summary</label>
+                        <button type="button" class="draft-btn" id="draftBestOfDayBtn" disabled>
+                            Draft
+                        </button>
+                    </div>
                     <textarea
                         id="bestOfDaySummary"
                         name="bestOfDaySummary"
@@ -1322,8 +1463,9 @@
                         placeholder="One overall note on jump / hop / pull tests..."
                     ></textarea>
                     <div class="helper-text">
-                        Printed in the Overall Summary box under Best of Day Metrics.
+                        Printed in the Overall Summary box under Force-Plate Metrics.
                     </div>
+                    <div class="helper-text draft-status" id="draftBestOfDayStatus"></div>
                 </div>
             
                 <button type="submit" id="submitBtn">
@@ -1454,13 +1596,15 @@
                     <label>Mechanics phase cards (optional)</label>
                     <p class="section-intro" style="margin: 0 0 12px;">
                         Existing photos load into each phase card. Drag and zoom to
-                        reframe. Choose a file to replace, or remove the photo.
+                        reframe. Choose a file to replace, capture a frame from a swing
+                        video, or remove the photo.
                         Captions stay in the box on the card.
                         PNG/JPEG/WebP, up to 4&nbsp;MB each, one photo per phase.
                     </p>
                     <button type="button" class="secondary-btn" id="loadAttachmentsBtn">
                         Reload saved images
                     </button>
+                    <div id="regenSwingClipper"></div>
                     <div id="regenMechanicsRows"></div>
                 </div>
                 <div class="form-group">
@@ -1480,20 +1624,32 @@
             <div class="wizard-step" data-step="3" hidden>
                 <h2 class="wizard-step-title">Notes</h2>
                 <div class="form-group">
-                    <label for="regenMechanicalSummary">Mechanical Observation</label>
+                    <div class="notes-field-head">
+                        <label for="regenMechanicalSummary">Mechanical Observation</label>
+                        <button type="button" class="draft-btn" id="regenDraftMechanicalBtn" disabled>
+                            Draft
+                        </button>
+                    </div>
                     <textarea
                         id="regenMechanicalSummary"
                         class="notes-field"
                         placeholder="Overall mechanical takeaways for this session..."
                     ></textarea>
+                    <div class="helper-text draft-status" id="regenDraftMechanicalStatus"></div>
                 </div>
                 <div class="form-group">
-                    <label for="regenTrainingFocus">Training Focus</label>
+                    <div class="notes-field-head">
+                        <label for="regenTrainingFocus">Training Focus</label>
+                        <button type="button" class="draft-btn" id="regenDraftTrainingFocusBtn" disabled>
+                            Draft
+                        </button>
+                    </div>
                     <textarea
                         id="regenTrainingFocus"
                         class="notes-field"
                         placeholder="Eliminate sway in the load"
                     ></textarea>
+                    <div class="helper-text draft-status" id="regenDraftTrainingFocusStatus"></div>
                 </div>
                 <div class="form-group">
                     <label for="regenNotes">Assessment Notes</label>
@@ -1504,12 +1660,18 @@
                     ></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="regenBestOfDaySummary">Best of Day Summary</label>
+                    <div class="notes-field-head">
+                        <label for="regenBestOfDaySummary">Force-Plate Metrics Summary</label>
+                        <button type="button" class="draft-btn" id="regenDraftBestOfDayBtn" disabled>
+                            Draft
+                        </button>
+                    </div>
                     <textarea
                         id="regenBestOfDaySummary"
                         class="notes-field"
                         placeholder="One overall note on jump / hop / pull tests..."
                     ></textarea>
+                    <div class="helper-text draft-status" id="regenDraftBestOfDayStatus"></div>
                 </div>
             </div>
 
@@ -1794,6 +1956,263 @@
             preview.hidden = false;
         }
 
+        function formatClipTime(seconds) {
+            if (!Number.isFinite(seconds) || seconds < 0) return '0:00.00';
+            const m = Math.floor(seconds / 60);
+            const s = seconds - m * 60;
+            return `${m}:${s.toFixed(2).padStart(5, '0')}`;
+        }
+
+        function assignFileToInput(fileInput, file) {
+            if (!fileInput || !file) return false;
+            try {
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                return true;
+            } catch (err) {
+                return false;
+            }
+        }
+
+        async function videoFrameToJpeg(video, filename) {
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (!vw || !vh) {
+                throw new Error('Video is not ready yet. Wait a moment and try again.');
+            }
+            const maxSide = 1920;
+            let w = vw;
+            let h = vh;
+            if (Math.max(w, h) > maxSide) {
+                const scale = maxSide / Math.max(w, h);
+                w = Math.max(1, Math.round(w * scale));
+                h = Math.max(1, Math.round(h * scale));
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, w, h);
+            const qualities = [0.9, 0.8, 0.7, 0.55];
+            let lastBlob = null;
+            for (const q of qualities) {
+                lastBlob = await new Promise((resolve) => {
+                    canvas.toBlob(resolve, 'image/jpeg', q);
+                });
+                if (lastBlob && lastBlob.size <= 4 * 1024 * 1024) {
+                    return new File([lastBlob], filename, { type: 'image/jpeg' });
+                }
+            }
+            throw new Error('This frame is still over 4 MB after compression.');
+        }
+
+        function mountSwingClipper(root, cardsContainer) {
+            if (!root || !cardsContainer) return { clear() {} };
+            root.classList.add('swing-clipper');
+            root.innerHTML = `
+                <label>Swing video (optional)</label>
+                <p class="helper-text" style="margin: 0 0 8px;">
+                    Stays on this device — it is not uploaded. MP4 (H.264) or WebM work best.
+                    Pause on the frame, pick a phase, then capture. You can still set status
+                    and caption here or on the card. After capture, drag/zoom the still as usual.
+                </p>
+                <input type="file" class="swing-clipper-file" accept="video/mp4,video/webm,video/quicktime,video/*">
+                <div class="swing-clipper-video-wrap">
+                    <video class="swing-clipper-video" playsinline controls></video>
+                    <div class="swing-clipper-toolbar">
+                        <button type="button" class="secondary-btn swing-clipper-btn swing-clipper-back">−1 frame</button>
+                        <button type="button" class="secondary-btn swing-clipper-btn swing-clipper-fwd">+1 frame</button>
+                        <span class="swing-clipper-time">0:00.00</span>
+                    </div>
+                    <div class="swing-clipper-grid">
+                        <div>
+                            <label>Phase</label>
+                            <select class="swing-clipper-phase"></select>
+                        </div>
+                        <div>
+                            <label>Status (optional)</label>
+                            <select class="swing-clipper-status-sel">
+                                <option value="">Status (optional)</option>
+                                <option value="strength">Strength</option>
+                                <option value="monitor">Monitor</option>
+                                <option value="development">Development</option>
+                            </select>
+                        </div>
+                        <div class="form-span">
+                            <label>Caption (optional)</label>
+                            <textarea class="swing-clipper-caption" placeholder="Cue for this phase (optional)"></textarea>
+                        </div>
+                    </div>
+                    <button type="button" class="secondary-btn swing-clipper-capture">Capture this frame</button>
+                    <button type="button" class="secondary-btn swing-clipper-btn swing-clipper-clear">Remove video</button>
+                </div>
+                <div class="swing-clipper-status"></div>
+            `;
+            const fileInput = root.querySelector('.swing-clipper-file');
+            const wrap = root.querySelector('.swing-clipper-video-wrap');
+            const video = root.querySelector('.swing-clipper-video');
+            const timeEl = root.querySelector('.swing-clipper-time');
+            const phaseSel = root.querySelector('.swing-clipper-phase');
+            const statusSel = root.querySelector('.swing-clipper-status-sel');
+            const captionEl = root.querySelector('.swing-clipper-caption');
+            const statusNote = root.querySelector('.swing-clipper-status');
+            const captureBtn = root.querySelector('.swing-clipper-capture');
+            let objectUrl = '';
+            const frameStep = 1 / 30;
+
+            MECHANICS_PHASES.forEach((phase) => {
+                const opt = document.createElement('option');
+                opt.value = phase.slot;
+                opt.textContent = phase.label;
+                phaseSel.appendChild(opt);
+            });
+
+            function setNote(text) {
+                statusNote.textContent = text || '';
+            }
+
+            function cardForSlot(slot) {
+                return cardsContainer.querySelector(`.mechanics-phase-card[data-slot="${slot}"]`);
+            }
+
+            function highlightTarget() {
+                cardsContainer.querySelectorAll('.mechanics-phase-card').forEach((card) => {
+                    card.classList.toggle('is-clip-target', card.dataset.slot === phaseSel.value);
+                });
+            }
+
+            function loadFieldsFromCard() {
+                const card = cardForSlot(phaseSel.value);
+                if (!card) return;
+                const st = card.querySelector('.mechanics-phase-status');
+                const cap = card.querySelector('.mechanics-phase-notes');
+                statusSel.value = (st && st.value) || '';
+                captionEl.value = (cap && cap.value) || '';
+                autosizeTextarea(captionEl);
+                highlightTarget();
+            }
+
+            function applyFieldsToCard() {
+                const card = cardForSlot(phaseSel.value);
+                if (!card) return;
+                const st = card.querySelector('.mechanics-phase-status');
+                const cap = card.querySelector('.mechanics-phase-notes');
+                if (st) {
+                    st.value = statusSel.value;
+                    st.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (cap) {
+                    cap.value = captionEl.value;
+                    autosizeTextarea(cap);
+                    cap.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+
+            function updateTime() {
+                timeEl.textContent = `${formatClipTime(video.currentTime)} / ${formatClipTime(video.duration)}`;
+            }
+
+            function seekBy(delta) {
+                if (!video.duration) return;
+                video.pause();
+                const next = Math.min(Math.max(0, video.currentTime + delta), video.duration);
+                video.currentTime = next;
+            }
+
+            function clearVideo() {
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+                if (objectUrl) {
+                    URL.revokeObjectURL(objectUrl);
+                    objectUrl = '';
+                }
+                fileInput.value = '';
+                root.classList.remove('is-ready');
+                wrap.style.display = '';
+                setNote('');
+                highlightTarget();
+            }
+
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) return;
+                if (objectUrl) URL.revokeObjectURL(objectUrl);
+                objectUrl = URL.createObjectURL(file);
+                video.src = objectUrl;
+                root.classList.add('is-ready');
+                setNote('Pause on the frame you want, choose a phase, then capture.');
+                video.addEventListener('loadeddata', () => {
+                    updateTime();
+                    loadFieldsFromCard();
+                }, { once: true });
+            });
+            video.addEventListener('timeupdate', updateTime);
+            video.addEventListener('seeked', updateTime);
+            video.addEventListener('loadedmetadata', updateTime);
+            root.querySelector('.swing-clipper-back').addEventListener('click', () => seekBy(-frameStep));
+            root.querySelector('.swing-clipper-fwd').addEventListener('click', () => seekBy(frameStep));
+            root.querySelector('.swing-clipper-clear').addEventListener('click', clearVideo);
+            phaseSel.addEventListener('change', loadFieldsFromCard);
+            video.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    seekBy(-frameStep);
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    seekBy(frameStep);
+                }
+            });
+            captureBtn.addEventListener('click', async () => {
+                const slot = phaseSel.value;
+                const phase = MECHANICS_PHASES.find((p) => p.slot === slot);
+                const card = cardForSlot(slot);
+                if (!card || !phase) {
+                    setNote('Choose a swing phase first.');
+                    return;
+                }
+                if (!video.videoWidth) {
+                    setNote('Video is still loading.');
+                    return;
+                }
+                const fileEl = card.querySelector('.visual-file');
+                const hasNew = fileEl && fileEl.files && fileEl.files[0];
+                const hasSaved = Boolean(card.dataset.attachmentId);
+                if (hasNew || hasSaved) {
+                    if (!window.confirm(`Replace the ${phase.label} photo with this frame?`)) {
+                        return;
+                    }
+                }
+                captureBtn.disabled = true;
+                setNote('Capturing frame…');
+                try {
+                    video.pause();
+                    await new Promise((resolve) => {
+                        if (video.seeking) {
+                            video.addEventListener('seeked', resolve, { once: true });
+                        } else {
+                            resolve();
+                        }
+                    });
+                    const file = await videoFrameToJpeg(video, `${slot}.jpg`);
+                    applyFieldsToCard();
+                    if (!assignFileToInput(fileEl, file)) {
+                        throw new Error('Could not attach the still to this phase card.');
+                    }
+                    setNote(`Captured ${phase.label} at ${formatClipTime(video.currentTime)}. Drag/zoom the still if needed.`);
+                    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } catch (err) {
+                    setNote(err.message || 'Could not capture this frame.');
+                } finally {
+                    captureBtn.disabled = false;
+                }
+            });
+            loadFieldsFromCard();
+            return { clear: clearVideo };
+        }
+
         function refreshVisualOrderLabels(container) {
             container.querySelectorAll('.visual-row').forEach((row, idx) => {
                 const badge = row.querySelector('.visual-order');
@@ -2046,6 +2465,14 @@
         regenAddVisualBtn.addEventListener('click', () => addVisualRow(regenVisualRowsEl, regenAddVisualBtn));
         initMechanicsRows(mechanicsRowsEl);
         initMechanicsRows(regenMechanicsRowsEl);
+        const createSwingClip = mountSwingClipper(
+            document.getElementById('createSwingClipper'),
+            mechanicsRowsEl
+        );
+        const regenSwingClip = mountSwingClipper(
+            document.getElementById('regenSwingClipper'),
+            regenMechanicsRowsEl
+        );
         addVisualRow(visualRowsEl, addVisualBtn);
         addVisualRow(regenVisualRowsEl, regenAddVisualBtn);
 
@@ -2303,6 +2730,191 @@
 
         document.querySelectorAll('textarea.notes-field').forEach(enhanceNotesEditor);
 
+        function setDraftStatus(el, text, kind) {
+            if (!el) return;
+            el.textContent = text || '';
+            el.classList.remove('is-error', 'is-ok');
+            if (kind) el.classList.add(kind);
+        }
+
+        function phasePackHasText(container) {
+            return Object.keys(collectMechanicsPhaseNotes(container)).length > 0;
+        }
+
+        function setDraftEnabled(btn, enabled, reason) {
+            if (!btn) return;
+            btn.disabled = !enabled;
+            btn.title = enabled
+                ? 'Draft this box from the form context (edit before submit)'
+                : (reason || '');
+        }
+
+        let draftInFlight = '';
+        let createPreviousTrainingFocus = '';
+        let createValdPeekFound = false;
+        let regenValdPeekFound = false;
+
+        function refreshDraftButtons() {
+            const createPhases = phasePackHasText(mechanicsRowsEl);
+            const createMech = (document.getElementById('mechanicalSummary').value || '').trim();
+            const createNotes = (document.getElementById('notes').value || '').trim();
+            const createPlayer = (playerNameInput.value || '').trim().length >= 2;
+            const createDate = !!(assessmentDateInput.value);
+            const busy = !!draftInFlight;
+            setDraftEnabled(
+                document.getElementById('draftMechanicalBtn'),
+                !busy && createPhases,
+                'Add phase status or captions first.'
+            );
+            setDraftEnabled(
+                document.getElementById('draftTrainingFocusBtn'),
+                !busy && (createPhases || !!createMech || !!createNotes),
+                'Add phase notes, Mechanical Observation, or Assessment Notes first.'
+            );
+            setDraftEnabled(
+                document.getElementById('draftBestOfDayBtn'),
+                !busy && createPlayer && createDate && createValdPeekFound,
+                'Needs a player, date, and force-plate tests for that day.'
+            );
+
+            const regenPhases = phasePackHasText(regenMechanicsRowsEl);
+            const regenMech = (regenMechanicalSummaryEl.value || '').trim();
+            const regenNotes = (regenNotesEl.value || '').trim();
+            const regenPlayer = !!(regenLoadedDetails && regenLoadedDetails.player_name);
+            const regenDate = !!(regenLoadedDetails && regenLoadedDetails.assessment_date);
+            setDraftEnabled(
+                document.getElementById('regenDraftMechanicalBtn'),
+                !busy && regenPhases,
+                'Add phase status or captions first.'
+            );
+            setDraftEnabled(
+                document.getElementById('regenDraftTrainingFocusBtn'),
+                !busy && (regenPhases || !!regenMech || !!regenNotes),
+                'Add phase notes, Mechanical Observation, or Assessment Notes first.'
+            );
+            setDraftEnabled(
+                document.getElementById('regenDraftBestOfDayBtn'),
+                !busy && regenPlayer && regenDate && regenValdPeekFound,
+                'Needs force-plate tests for this assessment date.'
+            );
+        }
+
+        async function requestNoteDraft(kind, payload, textarea, statusEl) {
+            if (textarea.value.trim()) {
+                const ok = window.confirm('Replace the current text with a new draft?');
+                if (!ok) return;
+            }
+            draftInFlight = kind;
+            refreshDraftButtons();
+            setDraftStatus(statusEl, 'Drafting…');
+            try {
+                const response = await fetch(`${API_URL}/draft-summaries`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.error || `Draft failed (${response.status})`);
+                }
+                textarea.value = data.text || '';
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                autosizeTextarea(textarea);
+                setDraftStatus(statusEl, 'Filled — edit before submit.', 'is-ok');
+            } catch (err) {
+                setDraftStatus(statusEl, err.message || 'Draft failed.', 'is-error');
+            } finally {
+                draftInFlight = '';
+                refreshDraftButtons();
+            }
+        }
+
+        function createDraftPayload(kind) {
+            return {
+                kind,
+                playerName: titleCaseName(playerNameInput.value.trim()),
+                assessmentDate: assessmentDateInput.value,
+                mechanicsPhaseNotes: collectMechanicsPhaseNotes(mechanicsRowsEl),
+                mechanicalSummary: document.getElementById('mechanicalSummary').value.trim(),
+                assessmentNotes: document.getElementById('notes').value.trim(),
+                previousTrainingFocus: createPreviousTrainingFocus,
+            };
+        }
+
+        function regenDraftPayload(kind) {
+            const details = regenLoadedDetails || {};
+            return {
+                kind,
+                playerName: details.player_name || regenPlayerNameEl.value.trim(),
+                assessmentDate: details.assessment_date || '',
+                mechanicsPhaseNotes: collectMechanicsPhaseNotes(regenMechanicsRowsEl),
+                mechanicalSummary: regenMechanicalSummaryEl.value.trim(),
+                assessmentNotes: regenNotesEl.value.trim(),
+                previousTrainingFocus: '',
+            };
+        }
+
+        document.getElementById('draftMechanicalBtn').addEventListener('click', () => {
+            requestNoteDraft(
+                'mechanical',
+                createDraftPayload('mechanical'),
+                document.getElementById('mechanicalSummary'),
+                document.getElementById('draftMechanicalStatus')
+            );
+        });
+        document.getElementById('draftTrainingFocusBtn').addEventListener('click', () => {
+            requestNoteDraft(
+                'training_focus',
+                createDraftPayload('training_focus'),
+                document.getElementById('trainingFocus'),
+                document.getElementById('draftTrainingFocusStatus')
+            );
+        });
+        document.getElementById('draftBestOfDayBtn').addEventListener('click', () => {
+            requestNoteDraft(
+                'best_of_day',
+                createDraftPayload('best_of_day'),
+                document.getElementById('bestOfDaySummary'),
+                document.getElementById('draftBestOfDayStatus')
+            );
+        });
+        document.getElementById('regenDraftMechanicalBtn').addEventListener('click', () => {
+            requestNoteDraft(
+                'mechanical',
+                regenDraftPayload('mechanical'),
+                regenMechanicalSummaryEl,
+                document.getElementById('regenDraftMechanicalStatus')
+            );
+        });
+        document.getElementById('regenDraftTrainingFocusBtn').addEventListener('click', () => {
+            requestNoteDraft(
+                'training_focus',
+                regenDraftPayload('training_focus'),
+                regenTrainingFocusEl,
+                document.getElementById('regenDraftTrainingFocusStatus')
+            );
+        });
+        document.getElementById('regenDraftBestOfDayBtn').addEventListener('click', () => {
+            requestNoteDraft(
+                'best_of_day',
+                regenDraftPayload('best_of_day'),
+                regenBestOfDaySummaryEl,
+                document.getElementById('regenDraftBestOfDayStatus')
+            );
+        });
+
+        [mechanicsRowsEl, regenMechanicsRowsEl].forEach((el) => {
+            el.addEventListener('input', refreshDraftButtons);
+            el.addEventListener('change', refreshDraftButtons);
+        });
+        [
+            'mechanicalSummary', 'trainingFocus', 'notes',
+            'regenMechanicalSummary', 'regenTrainingFocus', 'regenNotes',
+        ].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', refreshDraftButtons);
+        });
+
         regenNotesEl.addEventListener('input', () => { regenNotesDirty = true; });
         regenVideoUrlEl.addEventListener('input', () => { regenVideoDirty = true; });
         regenMechanicalSummaryEl.addEventListener('input', () => { regenMechSummaryDirty = true; });
@@ -2348,6 +2960,7 @@
             regenTrainingFocusDirty = false;
             regenBestOfDayDirty = false;
             regenPhaseNotesDirty = false;
+            refreshDraftButtons();
         }
 
         async function loadAssessmentDetails(assessmentId) {
@@ -2757,6 +3370,7 @@
                 regenLoadedDetails = null;
                 if (reportVersionsEl) reportVersionsEl.innerHTML = '';
                 refreshRegenPlayerBio();
+                refreshDraftButtons();
                 throw err;
             }
         }
@@ -2992,9 +3606,12 @@
                 trainingFocusEl.value = '';
                 trainingFocusHintEl.textContent = TRAINING_FOCUS_HINT_DEFAULT;
                 applyCarriedDevelopment(mechanicsRowsEl, {});
+                createPreviousTrainingFocus = '';
+                refreshDraftButtons();
                 return;
             }
             const focus = (latest.training_focus || '').trim();
+            createPreviousTrainingFocus = focus;
             trainingFocusEl.value = focus;
             applyCarriedDevelopment(mechanicsRowsEl, latest.mechanics_phase_notes || {});
             const devCount = Object.keys(
@@ -3013,6 +3630,7 @@
             } else {
                 trainingFocusHintEl.textContent = TRAINING_FOCUS_HINT_DEFAULT;
             }
+            refreshDraftButtons();
         }
 
         function bindPlayerRosterInput(input, listEl, { onCommit } = {}) {
@@ -3153,11 +3771,14 @@
         playerNameInput.addEventListener('input', () => {
             clearTimeout(createBioTimer);
             createBioTimer = setTimeout(() => refreshCreatePlayerBio(), 400);
+            refreshDraftButtons();
         });
 
         assessmentDateInput.addEventListener('change', () => {
             refreshCreatePlayerBio();
+            refreshDraftButtons();
         });
+        refreshDraftButtons();
 
         document.getElementById('trainerName').addEventListener('blur', function () {
             this.value = titleCaseName(this.value);
@@ -3450,7 +4071,7 @@
                 if (regenVideoDirty) changes.push('updated video link');
                 if (regenMechSummaryDirty) changes.push('updated mechanical observation');
                 if (regenTrainingFocusDirty) changes.push('updated training focus');
-                if (regenBestOfDayDirty) changes.push('updated best of day summary');
+                if (regenBestOfDayDirty) changes.push('updated Force-Plate Metrics summary');
                 if (regenToolsDirty) changes.push('updated tools');
                 if (regenPhaseNotesDirty) changes.push('updated phase notes');
                 const html = await regenerateReport(id, {
@@ -3773,6 +4394,13 @@
                 ? (valdParts.join(' · ') || `${vald.trial_count} test(s)`)
                 : 'No tests found for this date';
 
+            if (target === 'regen') {
+                regenValdPeekFound = !!vald.found;
+            } else {
+                createValdPeekFound = !!vald.found;
+            }
+            refreshDraftButtons();
+
             setToolPeek(document.getElementById(
                 target === 'regen' ? 'regenUsedBlastPeek' : 'usedBlastPeek'
             ), { found: !!blast.found, text: blastText });
@@ -3812,6 +4440,8 @@
             const targets = ['usedBlastPeek', 'usedHittraxPeek', 'usedValdPeek'];
             if (!player || !dateStr) {
                 targets.forEach((id) => setToolPeek(document.getElementById(id), {}));
+                createValdPeekFound = false;
+                refreshDraftButtons();
                 return;
             }
             targets.forEach((id) => setToolPeek(document.getElementById(id), { loading: true }));
@@ -3821,6 +4451,8 @@
             } catch (err) {
                 const msg = err.message || 'Could not look up session data';
                 targets.forEach((id) => setToolPeek(document.getElementById(id), { error: msg }));
+                createValdPeekFound = false;
+                refreshDraftButtons();
             }
         }
 
@@ -3833,6 +4465,8 @@
                     text: 'Counts load after an assessment is selected.',
                     found: false,
                 }));
+                regenValdPeekFound = false;
+                refreshDraftButtons();
                 const els = targets.map((id) => document.getElementById(id));
                 els.forEach((el) => {
                     if (!el) return;
@@ -3848,6 +4482,8 @@
             } catch (err) {
                 const msg = err.message || 'Could not look up session data';
                 targets.forEach((id) => setToolPeek(document.getElementById(id), { error: msg }));
+                regenValdPeekFound = false;
+                refreshDraftButtons();
             }
         }
 
@@ -4159,8 +4795,11 @@
                         'success'
                     );
                     form.reset();
+                    createSwingClip.clear();
                     createStep = 0;
                     createCarryKey = '';
+                    createPreviousTrainingFocus = '';
+                    createValdPeekFound = false;
                     trainingFocusHintEl.textContent = TRAINING_FOCUS_HINT_DEFAULT;
                     initMechanicsRows(mechanicsRowsEl);
                     visualRowsEl.innerHTML = '';
@@ -4169,6 +4808,7 @@
                     assessmentDateInput.value = today;
                     resetTypePanel();
                     showChooser();
+                    refreshDraftButtons();
                     setTimeout(loadRecentNames, 1000);
                 } else {
                     showMessage(`Error: ${data.error || 'Failed to submit assessment'}`, 'error');

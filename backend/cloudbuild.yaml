@@ -35,7 +35,7 @@ steps:
       - --cpu=1
       - --max-instances=10
       - --set-env-vars=DB_PORT=3306,HEAT_GCS_BUCKET=heat-assessment-reports,HEAT_GCS_PREFIX=heat-assessments/,REPORT_LOCAL_DIR=/app/reports,HEAT_GCS_SIGNED_URL_MINUTES=60
-      - --set-secrets=DB_HOST=DB_HOST:latest,DB_USER=DB_USER:latest,DB_PASS=DB_PASS:latest,DB_NAME_PROD=DB_NAME_PROD:latest
+      - --set-secrets=DB_HOST=DB_HOST:latest,DB_USER=DB_USER:latest,DB_PASS=DB_PASS:latest,DB_NAME_PROD=DB_NAME_PROD:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
 
 images:
   - gcr.io/$PROJECT_ID/${_SERVICE_NAME}
